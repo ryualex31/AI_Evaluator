@@ -22,9 +22,6 @@ if "messages" not in st.session_state:
 if "pending_query" not in st.session_state:
     st.session_state.pending_query = None
 
-if "show_eval" not in st.session_state:
-    st.session_state.show_eval = False
-
 # ---------------- STYLING ---------------- #
 st.markdown("""
 <style>
@@ -94,14 +91,6 @@ with st.sidebar:
         if st.button(ex, key=f"example_{i}"):
             st.session_state.pending_query = ex
             st.rerun()
-
-    st.markdown("---")
-
-    # ✅ FIXED toggle persistence
-    st.session_state.show_eval = st.toggle(
-        "🧠 Show Evaluation Metrics",
-        value=st.session_state.show_eval
-    )
 
     st.markdown("---")
 
@@ -205,11 +194,9 @@ if user_input:
         answer = output.get("direct_answer") or output.get("message") or output.get("error")
         table = output.get("table")
         insight = output.get("insight")
-        evaluation = output.get("evaluation", {})  # ✅ FIX
 
         st.markdown(answer)
 
-        # Table + Chart
         if table:
             try:
                 df = pd.read_html(table)[0]
@@ -219,35 +206,12 @@ if user_input:
             except:
                 st.markdown(table)
 
-        # Insight
         if insight and insight.strip().upper() != "NONE":
             st.markdown(f"""
             <div style="background:#eef6ff;padding:12px;border-radius:10px;border:1px solid #c7ddff;margin-top:10px;">
             💡 <b>Insight:</b><br>{insight}
             </div>
             """, unsafe_allow_html=True)
-
-        # ---------------- EVALUATION ---------------- #
-        if st.session_state.show_eval and evaluation is not None:
-
-            st.markdown("### 🧠 Evaluation Metrics")
-
-            col1, col2, col3, col4, col5 = st.columns(5)
-
-            with col1:
-                st.metric("Accuracy", evaluation.get("accuracy", "N/A"))
-            with col2:
-                st.metric("Coverage", evaluation.get("coverage", "N/A"))
-            with col3:
-                st.metric("Faithfulness", evaluation.get("faithfulness", "N/A"))
-            with col4:
-                st.metric("Clarity", evaluation.get("clarity", "N/A"))
-            with col5:
-                st.metric("Overall", evaluation.get("overall", "N/A"))
-
-            if evaluation.get("reasoning"):
-                with st.expander("🔍 Detailed Evaluation"):
-                    st.markdown(evaluation["reasoning"])
 
         # ---------------- FEEDBACK ---------------- #
         st.markdown("##### Was this helpful?")
