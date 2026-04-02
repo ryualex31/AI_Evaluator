@@ -106,9 +106,7 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # ✅ Evaluation toggle
-    show_eval = st.toggle("🧠 Show Evaluation Metrics")
-    st.session_state.show_eval = show_eval
+    st.session_state.show_eval = st.toggle("🧠 Show Evaluation Metrics")
 
     st.markdown("---")
 
@@ -134,7 +132,6 @@ if not st.session_state.messages:
         border:1px solid #e5e7eb;
         margin-bottom:10px;
     ">
-    <br>
     💡 <b>You can ask:</b>
     <ul>
     <li>📈 Revenue and profit trends</li>
@@ -180,15 +177,11 @@ def generate_chart(df, user_query):
                             st.markdown("### 📊 Comparison View")
                             st.bar_chart(df.set_index(x_col)[col])
                             return
-
     except:
         pass
 
 # ---------------- CHAT DISPLAY ---------------- #
-avatar_map = {
-    "user": "🧑‍💼",
-    "assistant": "🤖"
-}
+avatar_map = {"user": "🧑‍💼", "assistant": "🤖"}
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar=avatar_map[msg["role"]]):
@@ -204,10 +197,7 @@ if st.session_state.pending_query:
 # ---------------- PROCESS ---------------- #
 if user_input:
 
-    st.session_state.messages.append({
-        "role": "user",
-        "content": user_input
-    })
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
     with st.chat_message("user", avatar="🧑‍💼"):
         st.markdown(user_input)
@@ -217,67 +207,49 @@ if user_input:
         with st.spinner("🤖 Analyzing your data..."):
             output = run_agent(user_input, schema)
 
-        if "message" in output:
-            answer = output["message"]
-            table = None
-            insight = None
-        elif "error" in output:
-            answer = output["error"]
-            table = None
-            insight = None
-        else:
-            answer = output["direct_answer"]
-            table = output.get("table")
-            insight = output.get("insight")
+        answer = output.get("direct_answer") or output.get("message") or output.get("error")
+        table = output.get("table")
+        insight = output.get("insight")
+        evaluation = output.get("evaluation")
 
         st.markdown(answer)
 
+        # Table + Chart
         if table:
             try:
                 df = pd.read_html(table)[0]
-
                 st.markdown("### 📊 Data Snapshot")
                 st.dataframe(df, use_container_width=True)
-
                 generate_chart(df, user_input)
-
             except:
                 st.markdown(table)
 
+        # Insight
         if insight:
-            clean_answer = answer.lower().replace("$", "").replace(",", "").strip()
-            clean_insight = insight.lower().replace("$", "").replace(",", "").strip()
-
-            if clean_answer != clean_insight:
+            if insight.strip().upper() != "NONE":
                 st.markdown(f"""
-                <div style="
-                    background-color:#eef6ff;
-                    padding:12px;
-                    border-radius:10px;
-                    border:1px solid #c7ddff;
-                    margin-top:10px;
-                ">
+                <div style="background:#eef6ff;padding:12px;border-radius:10px;border:1px solid #c7ddff;margin-top:10px;">
                 💡 <b>Insight:</b><br>{insight}
                 </div>
                 """, unsafe_allow_html=True)
 
-        # ---------------- EVALUATION PANEL ---------------- #
-        if st.session_state.show_eval and "evaluation" in output:
-
-            evaluation = output["evaluation"]
+        # ---------------- EVALUATION ---------------- #
+        if st.session_state.show_eval and evaluation:
 
             st.markdown("### 🧠 Evaluation Metrics")
 
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4, col5 = st.columns(5)
 
             with col1:
-                st.metric("Correctness", evaluation.get("correctness", "N/A"))
-
+                st.metric("Accuracy", evaluation.get("accuracy", "N/A"))
             with col2:
                 st.metric("Coverage", evaluation.get("coverage", "N/A"))
-
             with col3:
                 st.metric("Faithfulness", evaluation.get("faithfulness", "N/A"))
+            with col4:
+                st.metric("Clarity", evaluation.get("clarity", "N/A"))
+            with col5:
+                st.metric("Overall", evaluation.get("overall", "N/A"))
 
             if evaluation.get("reasoning"):
                 with st.expander("🔍 Detailed Evaluation"):
@@ -285,27 +257,16 @@ if user_input:
 
         # ---------------- FEEDBACK ---------------- #
         st.markdown("##### Was this helpful?")
-        col1, col2, col3 = st.columns([1,1,8])
+        col1, col2 = st.columns(2)
 
         with col1:
             if st.button("👍", key=f"up_{len(st.session_state.messages)}"):
-                log_feedback({
-                    "query": user_input,
-                    "response": answer,
-                    "feedback": "up"
-                })
+                log_feedback({"query": user_input, "response": answer, "feedback": "up"})
                 st.success("Feedback recorded")
 
         with col2:
             if st.button("👎", key=f"down_{len(st.session_state.messages)}"):
-                log_feedback({
-                    "query": user_input,
-                    "response": answer,
-                    "feedback": "down"
-                })
+                log_feedback({"query": user_input, "response": answer, "feedback": "down"})
                 st.warning("Feedback recorded")
 
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": answer
-    })
+    st.session_state.messages.append({"role": "assistant", "content": answer})

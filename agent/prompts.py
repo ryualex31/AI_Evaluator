@@ -1,64 +1,90 @@
 # ---------------- INTENT CLASSIFIER ---------------- #
 def intent_prompt(query):
     return f"""
-You are an intelligent query classifier for a financial AI assistant.
+You are a strict intent classifier for a financial AI system.
 
-Classify the user query into ONE of the following:
+Classify into EXACTLY ONE:
 
-1. FINANCE_QUERY → financial analysis, revenue, cost, profit, trends
-2. GENERAL_QUERY → "who are you", "what can you do"
-3. GREETING → greetings like "hi", "hello", "hey"
-4. IRRELEVANT_QUERY → jokes, unrelated topics
+- FINANCE_QUERY
+- GENERAL_QUERY
+- GREETING
+- IRRELEVANT_QUERY
+
+EXAMPLES:
+Q: What is total revenue? → FINANCE_QUERY
+Q: Hi there → GREETING
+Q: What can you do? → GENERAL_QUERY
+Q: Tell me a joke → IRRELEVANT_QUERY
+
+RULES:
+- Return ONLY label
+- No explanation
 
 Query:
 "{query}"
 
-Return ONLY one label.
+Output:
 """
 
 
-# ---------------- SQL GENERATION ---------------- #
+# ---------------- SQL GENERATION (Few-shot + CoT Controlled) ---------------- #
 def sql_prompt(query, schema):
     return f"""
-You are an expert SQL generator for a financial analytics system.
+You are an expert SQLite query generator.
 
-Your task:
-Convert the user question into a valid SQLite SQL query.
+Your goal:
+Convert the question into a correct SQL query.
 
-DATABASE SCHEMA:
+SCHEMA:
 {schema}
 
-AVAILABLE COLUMNS:
-- date, month, year
-- region, country
-- product, category
-- customer_type, supplier
-- revenue, cost, profit, profit_margin
-- units_sold, discount
+### THINKING PROCESS (DO NOT OUTPUT):
+1. Identify metric (revenue, profit, etc.)
+2. Identify grouping (region, month, product)
+3. Identify filters (year, etc.)
+4. Construct SQL
 
-STRICT RULES:
-1. Use ONLY the given schema
-2. DO NOT hallucinate columns
-3. DO NOT use JOINs
-4. Use GROUP BY for aggregations
-5. Use ORDER BY for ranking (e.g., "top", "highest")
-6. Use LIMIT when needed
-7. Keep SQL simple and valid for SQLite
+### EXAMPLES:
 
-OUTPUT:
-Return ONLY the SQL query (no explanation, no markdown)
+Q: Total revenue in 2024
+SQL:
+SELECT SUM(revenue) FROM financials WHERE year = 2024;
 
-USER QUESTION:
+Q: Profit by region
+SQL:
+SELECT region, SUM(profit) as total_profit
+FROM financials
+GROUP BY region;
+
+Q: Top 3 products by profit
+SQL:
+SELECT product, SUM(profit) as total_profit
+FROM financials
+GROUP BY product
+ORDER BY total_profit DESC
+LIMIT 3;
+
+### RULES:
+- Use ONLY schema
+- No JOINs
+- Use GROUP BY for aggregation
+- Use ORDER BY + LIMIT for ranking
+- Keep SQL simple
+
+### OUTPUT:
+Return ONLY SQL
+
+QUESTION:
 {query}
+
+SQL:
 """
 
 
 # ---------------- SQL FIX ---------------- #
 def fix_sql_prompt(query, failed_sql, error, schema):
     return f"""
-You are an expert SQL debugger.
-
-The following SQL query failed.
+You are a SQL debugging expert.
 
 FAILED SQL:
 {failed_sql}
@@ -66,224 +92,97 @@ FAILED SQL:
 ERROR:
 {error}
 
-DATABASE SCHEMA:
-{schema}
-
-INSTRUCTIONS:
-- Fix the SQL query
-- Use ONLY the schema
-- DO NOT hallucinate columns
-- DO NOT use JOINs
-- Keep it valid SQLite
-
-Return ONLY the corrected SQL.
-
-USER QUESTION:
-{query}
-"""
-
-
-# ---------------- INSIGHT GENERATION ---------------- #
-def insight_prompt(query, data):
-    return f"""
-You are a senior financial analyst.
-
-Analyze the data and provide:
-
-1. Key Insight
-2. Business Interpretation
-3. Recommendation
-
-Keep it concise and business-focused.
-
-DATA:
-{data}
-
-QUESTION:
-{query}
-"""
-
-
-# ---------------- CONVERSATIONAL HANDLING ---------------- #
-def conversational_prompt(query, intent):
-    return f"""
-You are a friendly AI Financial Analyst assistant.
-
-User query:
-"{query}"
-
-Intent: {intent}
-
-Behavior:
-
-IF GREETING:
-- Greet warmly
-- Introduce yourself
-- Suggest example questions
-
-IF GENERAL_QUERY:
-- Explain what you can do
-- Give examples
-
-IF IRRELEVANT_QUERY:
-- Politely decline
-- Redirect to finance queries
-
-Guidelines:
-- Be natural
-- Be concise
-- Do NOT mention intent labels
-
-Respond directly.
-"""
-
-def summary_prompt(query, data):
-    return f"""
-You are a financial analyst writing a business summary.
-
-Your task is to summarize the results based ONLY on the data.
-
-STRICT GUIDELINES:
-
-1. Be factual and precise
-2. DO NOT use vague terms like:
-   - "very high", "very low", "huge", "massive"
-3. ONLY make comparisons if multiple data points exist
-4. If no comparison is possible → just state the result
-5. Use neutral, professional financial language
-6. Keep it concise (2–3 sentences max)
-
-GOOD EXAMPLES:
-- "North America generated the highest revenue among regions."
-- "Cloud Infrastructure contributes the largest share of total revenue."
-
-BAD EXAMPLES:
-- "Revenue is very high"
-- "This is performing extremely well"
-
-DATA:
-{data}
-
-QUESTION:
-{query}
-"""
-
-def evaluation_prompt(query, sql, data, insight):
-    return f"""
-You are an expert evaluator of financial AI systems.
-
-Evaluate the response based on the following:
-
-USER QUESTION:
-{query}
-
-SQL GENERATED:
-{sql}
-
-DATA RETURNED:
-{data}
-
-INSIGHT:
-{insight}
-
-METRICS:
-
-1. Accuracy (0-10)
-- Does the insight correctly reflect the data?
-- Any incorrect statements?
-
-2. Coverage (0-10)
-- Does it fully answer the question?
-- Or partially?
-
-3. Faithfulness (0-10)
-- Is the insight grounded strictly in the data?
-- Any hallucinations or assumptions?
-
-4. Clarity (0-10)
-- Is it easy to understand?
-- Well structured?
-
-OUTPUT FORMAT (STRICT):
-
-Accuracy: X/10  
-Coverage: X/10  
-Faithfulness: X/10  
-Clarity: X/10  
-Overall: X/10  
-
-Reason:
-<concise justification>
-"""# ---------------- INTENT ---------------- #
-def intent_prompt(query):
-    return f"""
-Classify into ONE:
-- FINANCE_QUERY
-- GENERAL_QUERY
-- GREETING
-- IRRELEVANT_QUERY
-
-Query:
-"{query}"
-
-Return ONLY label.
-"""
-
-
-# ---------------- SQL ---------------- #
-def sql_prompt(query, schema):
-    return f"""
-Generate SQLite SQL.
-
 SCHEMA:
 {schema}
+
+THINK:
+- Identify error
+- Fix syntax or column usage
 
 RULES:
 - Use ONLY schema
 - No JOINs
-- Use SUM/GROUP BY for aggregations
-- Use ORDER BY + LIMIT for ranking
-
-Return ONLY SQL.
+- Return ONLY corrected SQL
 
 QUESTION:
 {query}
+
+FIXED SQL:
 """
 
 
-# ---------------- SQL FIX ---------------- #
-def fix_sql_prompt(query, failed_sql, error, schema):
-    return f"""
-Fix SQL.
-
-FAILED:
-{failed_sql}
-
-ERROR:
-{error}
-
-SCHEMA:
-{schema}
-
-Return ONLY corrected SQL.
-
-QUESTION:
-{query}
-"""
-
-
-# ---------------- ANSWER ---------------- #
-def answer_prompt(query, data):
+# ---------------- DIRECT ANSWER ---------------- #
+def direct_answer_prompt(query, data):
     return f"""
 You are a financial analyst.
 
-Provide a DIRECT answer.
+### THINK (DO NOT OUTPUT):
+- Identify key metric
+- Extract exact value
 
-RULES:
-- 1–2 sentences
+### RULES:
+- One sentence only
 - No fluff
-- No vague terms
-- No bullets
+- Include value
+
+DATA:
+{data}
+
+QUESTION:
+{query}
+
+ANSWER:
+"""
+
+
+# ---------------- INSIGHT GENERATION (Few-shot + CoT Controlled) ---------------- #
+def insight_prompt(query, data):
+    return f"""
+You are a senior financial analyst.
+
+### THINKING STEPS (DO NOT OUTPUT):
+1. Look for trends (increase/decrease)
+2. Compare segments (region/product/customer)
+3. Identify drivers (high/low contributors)
+4. Check if insight is meaningful
+
+### EXAMPLES:
+
+DATA:
+Region A: 100
+Region B: 200
+
+OUTPUT:
+- Region B contributes more than Region A
+
+---
+
+DATA:
+Single value only
+
+OUTPUT:
+NONE
+
+---
+
+### RULES:
+- Do NOT repeat answer
+- Do NOT restate numbers
+- Max 2 insights
+- Each insight = 1 line
+- Use bullet format (- ...)
+- No intro text
+
+CRITICAL:
+If no meaningful insight → return EXACTLY:
+NONE
+
+### OUTPUT:
+- Insight 1
+- Insight 2
+
+OR:
+NONE
 
 DATA:
 {data}
@@ -293,23 +192,27 @@ QUESTION:
 """
 
 
-# ---------------- INSIGHT ---------------- #
-def insight_prompt(query, data):
+# ---------------- SUMMARY ---------------- #
+def summary_prompt(query, data):
     return f"""
-Provide short business insights ONLY if needed.
+You are a financial analyst.
+
+THINK:
+- Identify key takeaway
+- Compare if needed
 
 RULES:
-- 2-3 insights based on data
-- use bullets for each insight
-- No fluff
-- do not repeat the direct answer
-- if there's no insight - do no add anything beyond the direct answer
+- Max 2 sentences
+- No exaggeration
+- No vague words
 
 DATA:
 {data}
 
 QUESTION:
 {query}
+
+SUMMARY:
 """
 
 
@@ -323,88 +226,71 @@ User:
 
 Intent: {intent}
 
-Handle appropriately:
-- GREETING → greet + examples
-- GENERAL → explain capabilities
-- IRRELEVANT → redirect
+THINK:
+- Identify tone
+- Respond naturally
 
-Keep concise.
+RULES:
+- Max 2 sentences
+- No mention of intent labels
+
+RESPONSE:
 """
 
 
-# ---------------- EVALUATION ---------------- #
+# ---------------- EVALUATION (Few-shot + Strict JSON) ---------------- #
 def evaluation_prompt(query, sql, data, insight):
     return f"""
-You are an evaluation system for a financial AI assistant.
+You are an evaluator of a financial AI system.
 
-Evaluate the response based on:
-- accuracy (0-5)
-- coverage (0-5)
-- faithfulness (0-5)
-- clarity (0-5)
-- overall (0-5)
+Evaluate the response using these metrics (0 to 5):
 
-Also provide a short reasoning.
+- accuracy
+- coverage
+- faithfulness
+- clarity
+- overall
 
 STRICT RULES:
 - Return ONLY valid JSON
-- Do NOT include explanations outside JSON
-- Do NOT include markdown
-- Do NOT include text before or after JSON
+- DO NOT include markdown
+- DO NOT include extra text
+- DO NOT use fractions like 4/5 → use integer only
+- All values must be numbers (0–5)
 
+FORMAT:
+{{
+  "accuracy": 0,
+  "coverage": 0,
+  "faithfulness": 0,
+  "clarity": 0,
+  "overall": 0,
+  "reasoning": "short explanation"
+}}
+
+INPUT:
+Query: {query}
+SQL: {sql}
+Data: {data}
+Insight: {insight}
 """
 
-def direct_answer_prompt(query, data):
-    return f"""
-You are a financial analyst.
 
-Answer the question in a natural, conversational way.
-
-RULES:
-- Frame the response using the question context
-- 1 sentence only
-- Be precise and factual
-- Include key value(s)
-- No bullet points
-- No fluff
-
-EXAMPLES:
-Q: What is total revenue in 2024?
-A: The total revenue in 2024 is 1.2M.
-
-Q: Which product has highest profit?
-A: Cloud Infrastructure has the highest profit.
-
-DATA:
-{data}
-
-QUESTION:
-{query}
-"""
-
+# ---------------- NON-FINANCE ---------------- #
 def non_finance_prompt(query):
     return f"""
 You are an AI Financial Analyst assistant.
 
-The user asked something unrelated to finance:
-
+User:
 "{query}"
 
-Respond politely and naturally.
+THINK:
+- Respond politely
+- Redirect to finance
 
 RULES:
-- Be conversational
-- Keep it short (1–2 lines)
-- If possible, gently guide them back to finance topics
-- DO NOT refuse harshly
-- DO NOT mention restrictions explicitly
+- 1–2 sentences
+- No harsh refusal
 
-Examples:
-User: Tell me a joke  
-→ I'm more focused on financial insights, but I can help you analyze revenue, profit, and business trends.
-
-User: Who are you?  
-→ I'm an AI Financial Analyst designed to help you understand business performance and financial data.
-
-Now respond:
+RESPONSE:
 """

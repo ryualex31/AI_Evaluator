@@ -4,23 +4,58 @@ from agent.prompts import evaluation_prompt
 from utils.llm import call_llm
 
 
-def extract_json(text):
+def clean_llm_json(response: str):
     try:
-        # Extract JSON block using regex
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if match:
-            return json.loads(match.group())
-    except:
-        pass
-    return None
+        # Remove markdown
+        response = re.sub(r"```json|```", "", response).strip()
+
+        # Extract JSON
+        match = re.search(r"\{.*\}", response, re.DOTALL)
+        if not match:
+            return None
+
+        data = json.loads(match.group())
+
+        # Normalize keys + values
+        for key in ["accuracy", "coverage", "faithfulness", "clarity", "overall"]:
+            val = data.get(key)
+
+            # Handle "4/5" case
+            if isinstance(val, str) and "/" in val:
+                val = val.split("/")[0]
+
+            try:
+                data[key] = int(val)
+            except:
+                data[key] = None
+
+        return data
+
+    except Exception as e:
+        print("Parsing error:", e)
+        print("Raw response:", response)
+        return None
 
 
 def evaluate_response(query, sql, data, insight):
+
     response = call_llm(
         evaluation_prompt(query, sql, data, insight)
     )
 
-    parsed = extract_json(response)
+    print("\n=== EVALUATOR RAW ===\n", response)
+
+    if not response or response.strip() == "":
+        return {
+            "accuracy": None,
+            "coverage": None,
+            "faithfulness": None,
+            "clarity": None,
+            "overall": None,
+            "reasoning": "Empty response"
+        }
+
+    parsed = clean_llm_json(response)
 
     if parsed:
         return parsed
@@ -31,5 +66,5 @@ def evaluate_response(query, sql, data, insight):
         "faithfulness": None,
         "clarity": None,
         "overall": None,
-        "reason": f"Parsing failed. Raw output: {response}"
+        "reasoning": f"Parsing failed. Raw: {response}"
     }
