@@ -1,19 +1,20 @@
 import streamlit as st
 import pandas as pd
-import os
 import uuid
+import re
+
 from agent.orchestrator import run_agent
 from utils.logger import log_feedback
 
 # ---------------- CONFIG ---------------- #
-st.set_page_config(
-    page_title="AI Financial Analyst",
-    layout="wide"
-)
+st.set_page_config(page_title="AI Financial Analyst", layout="wide")
 
 # ---------------- SESSION ---------------- #
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
+
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
 if "query" not in st.session_state:
     st.session_state.query = ""
@@ -21,18 +22,20 @@ if "query" not in st.session_state:
 # ---------------- STYLING ---------------- #
 st.markdown("""
 <style>
-html, body, [class*="css"] {
-    background-color: #ffffff !important;
-    color: #111827;
+.card {
+    background-color: #ffffff;
+    color: #111827 !important;
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    margin-bottom: 10px;
 }
 
-.card {
-    background-color: white;
-    padding: 18px;
-    border-radius: 12px;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0px 2px 6px rgba(0,0,0,0.05);
-    margin-bottom: 15px;
+.user-card {
+    background-color: #f1f5f9;
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 5px;
 }
 
 .sidebar-card {
@@ -40,18 +43,16 @@ html, body, [class*="css"] {
     padding: 15px;
     border-radius: 10px;
     border: 1px solid #e5e7eb;
-    margin-bottom: 10px;
-}
-
-.block-container {
-    padding-top: 2rem;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------- LOGIN ---------------- #
-def check_login():
+def is_valid_email(email):
+    return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
+
+def check_login():
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
 
@@ -62,29 +63,24 @@ def check_login():
 
     with col2:
         st.markdown("""
-        <div style="
-            background-color:white;
-            padding:30px;
-            border-radius:12px;
-            border:1px solid #e5e7eb;
-            box-shadow:0px 4px 12px rgba(0,0,0,0.05);
-        ">
+        <div style="background:white;padding:30px;border-radius:12px;
+        border:1px solid #e5e7eb;box-shadow:0px 4px 12px rgba(0,0,0,0.05);">
         """, unsafe_allow_html=True)
 
-        st.markdown("### 🔐 Login")
+        st.markdown("### 🔐 Sign In")
 
-        username = st.text_input("Username")
+        email = st.text_input("Email")
         password = st.text_input("Password", type="password")
 
         if st.button("→"):
-            if (
-                username == os.getenv("APP_USERNAME")
-                and password == os.getenv("APP_PASSWORD")
-            ):
-                st.session_state.authenticated = True
-                st.rerun()
+            if not email or not password:
+                st.error("Please fill all fields")
+            elif not is_valid_email(email):
+                st.error("Enter valid email")
             else:
-                st.error("Invalid credentials")
+                st.session_state.authenticated = True
+                st.session_state.user_email = email
+                st.rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -96,14 +92,15 @@ if not check_login():
 
 # ---------------- SIDEBAR ---------------- #
 with st.sidebar:
+
+    st.markdown(f"👤 {st.session_state.get('user_email','')}")
+
     st.markdown("## 📌 Example Queries")
 
     examples = [
         "Total revenue by region",
         "Top 3 products by profit",
-        "Revenue trend over months",
-        "Profit margin by category",
-        "Which region is most profitable?"
+        "Revenue trend over months"
     ]
 
     for ex in examples:
@@ -114,16 +111,35 @@ with st.sidebar:
 
     st.markdown("## 📊 Insights You Can Explore")
 
+    # Bullet list
     st.markdown("""
     <div class="sidebar-card">
-    💰 Revenue trends  
-    📈 Profit drivers  
-    🌍 Regional performance  
-    🧾 Customer segmentation  
+    <ul style="padding-left:18px;">
+    <li>💰 Revenue trends</li>
+    <li>📈 Profit drivers</li>
+    <li>🌍 Regional performance</li>
+    <li>🧾 Customer segmentation</li>
+    </ul>
     </div>
     """, unsafe_allow_html=True)
 
+    # Clickable insights
+    insights = [
+        "Revenue trends",
+        "Profit drivers",
+        "Regional performance",
+        "Customer segmentation"
+    ]
+
+    for item in insights:
+        if st.button(item):
+            st.session_state.query = item
+
     st.markdown("---")
+
+    if st.button("🧹 Clear Chat"):
+        st.session_state.chat_history = []
+        st.rerun()
 
     if st.button("🚪 Logout"):
         st.session_state.authenticated = False
@@ -131,7 +147,6 @@ with st.sidebar:
 
 # ---------------- HEADER ---------------- #
 st.markdown("## 💰 AI Financial Analyst")
-st.caption("Ask financial questions and get instant business insights")
 
 # ---------------- SCHEMA ---------------- #
 schema = """
@@ -145,103 +160,65 @@ financials(
 )
 """
 
-# ---------------- INPUT (CHAT STYLE) ---------------- #
-col1, col2 = st.columns([10, 1])
+# ---------------- CHAT HISTORY ---------------- #
+st.markdown("### 💬 Conversation")
+
+for chat in reversed(st.session_state.chat_history):
+
+    st.markdown(f'<div class="user-card"><b>You:</b> {chat["query"]}</div>', unsafe_allow_html=True)
+
+    st.markdown(f'<div class="card"><b>Answer:</b> {chat["answer"]}</div>', unsafe_allow_html=True)
+
+    if chat["table"]:
+        st.markdown(chat["table"])
+
+    if chat["insight"]:
+        st.markdown(f'<div class="card">{chat["insight"]}</div>', unsafe_allow_html=True)
+
+# ---------------- INPUT ---------------- #
+col1, col2, col3 = st.columns([10,1,1])
 
 with col1:
-    query = st.text_input(
-        "",
-        value=st.session_state.query,
-        placeholder="Ask your financial question..."
-    )
+    query = st.text_input("", placeholder="Ask your financial question...")
 
 with col2:
     submit = st.button("➤")
 
-# ---------------- OUTPUT ---------------- #
-if query or submit:
+with col3:
+    reset = st.button("🔄")
 
-    if not query.strip():
-        st.stop()
+if reset:
+    st.session_state.chat_history = []
+    st.session_state.query = ""
+    st.rerun()
+
+# ---------------- RUN ---------------- #
+if query and submit:
 
     with st.spinner(""):
         output = run_agent(query, schema)
 
-    # 💬 Conversational
     if "message" in output:
-        st.markdown(f'<div class="card">{output["message"]}</div>', unsafe_allow_html=True)
+        answer = output["message"]
+        table = None
+        insight = None
 
-    # ❌ Error
     elif "error" in output:
-        st.markdown(f'<div class="card">⚠️ {output["error"]}</div>', unsafe_allow_html=True)
+        answer = output["error"]
+        table = None
+        insight = None
 
-    # ✅ Success
     else:
+        answer = output["direct_answer"]
+        table = output["table"]
+        insight = output.get("insight")
 
-        # 🧾 ANSWER
-        st.markdown("### 🧾 Answer")
-        st.markdown(
-            f'<div class="card"><b>{output["direct_answer"]}</b></div>',
-            unsafe_allow_html=True
-        )
+    # Store history
+    st.session_state.chat_history.append({
+        "query": query,
+        "answer": answer,
+        "table": table,
+        "insight": insight
+    })
 
-        # 📊 DATA
-        st.markdown("### 📊 Data")
-
-        df = pd.DataFrame(output["rows"], columns=output["columns"])
-
-        st.dataframe(
-            df.style.format({
-                col: "{:,.0f}" for col in df.select_dtypes("number").columns
-            }),
-            use_container_width=True,
-            height=300
-        )
-
-        # 🧠 INSIGHT
-        if output.get("insight"):
-            st.markdown("### 🧠 Insight")
-            st.markdown(
-                f'<div class="card">{output["insight"]}</div>',
-                unsafe_allow_html=True
-            )
-
-        # 🔍 EVALUATION
-        if output.get("evaluation"):
-            with st.expander("🔍 Show Evaluation"):
-
-                eval_data = output["evaluation"]
-
-                col1, col2, col3, col4 = st.columns(4)
-
-                col1.metric("Accuracy", eval_data.get("accuracy"))
-                col2.metric("Coverage", eval_data.get("coverage"))
-                col3.metric("Faithfulness", eval_data.get("faithfulness"))
-                col4.metric("Clarity", eval_data.get("clarity"))
-
-                st.markdown(f"**Overall Score:** {eval_data.get('overall')}")
-
-        # 👍 👎 FEEDBACK
-        st.markdown("### 👍 Feedback")
-
-        col1, col2 = st.columns(2)
-
-        if col1.button("👍"):
-            log_feedback({
-                "session_id": st.session_state.session_id,
-                "query": query,
-                "response": output.get("direct_answer"),
-                "feedback": "positive"
-            })
-            st.success("Thanks!")
-
-        if col2.button("👎"):
-            log_feedback({
-                "session_id": st.session_state.session_id,
-                "query": query,
-                "response": output.get("direct_answer"),
-                "feedback": "negative"
-            })
-            st.warning("Noted!")
-
-        st.caption(f"Retries used: {output['retries']}")
+    st.rerun()

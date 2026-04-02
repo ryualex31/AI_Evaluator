@@ -5,7 +5,8 @@ from agent.prompts import (
     insight_prompt,
     answer_prompt,
     direct_answer_prompt,
-    sql_prompt
+    sql_prompt,
+    non_finance_prompt
 )
 from agent.evaluator import evaluate_response
 from utils.llm import call_llm
@@ -20,32 +21,25 @@ def run_agent(user_query, schema):
     # ---------------- INTENT ---------------- #
     intent = classify_intent(user_query)
 
-    # ---------------- SAFE NON-FINANCE HANDLING ---------------- #
-    if intent == "GREETING":
-        response = "Hi! I’m your AI Financial Analyst. You can ask me about revenue, profit, trends, and business performance."
-        log_interaction({
-            "query": user_query,
-            "intent": intent,
-            "response": response
-        })
-        return {"message": response}
+    # ---------------- NON-FINANCE HANDLING (LLM BASED) ---------------- #
+    if intent != "FINANCE_QUERY":
+        try:
+            response = call_llm(
+                non_finance_prompt(user_query)
+            )
+        except Exception:
+            response = (
+                "I'm here to help with financial insights like revenue, "
+                "profit, and business trends."
+            )
 
-    if intent == "GENERAL_QUERY":
-        response = "I’m an AI Financial Analyst. I can help you analyze revenue, profit, trends, and business performance. Try asking something like 'Total revenue by region'."
+        # Logging
         log_interaction({
             "query": user_query,
             "intent": intent,
             "response": response
         })
-        return {"message": response}
 
-    if intent == "IRRELEVANT_QUERY":
-        response = "Sorry, I can only assist with finance-related queries such as revenue, profit, and business performance."
-        log_interaction({
-            "query": user_query,
-            "intent": intent,
-            "response": response
-        })
         return {"message": response}
 
     # ---------------- SQL GENERATION ---------------- #
