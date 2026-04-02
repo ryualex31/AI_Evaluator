@@ -16,26 +16,28 @@ if "session_id" not in st.session_state:
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-if "query" not in st.session_state:
-    st.session_state.query = ""
-
 # ---------------- STYLING ---------------- #
 st.markdown("""
 <style>
+
+.block-container {
+    padding-top: 2rem;
+}
+
 .card {
     background-color: #ffffff;
-    color: #111827 !important;
-    padding: 16px;
+    color: #111827;
+    padding: 14px;
     border-radius: 10px;
     border: 1px solid #e5e7eb;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .user-card {
     background-color: #f1f5f9;
     padding: 10px;
     border-radius: 10px;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
 }
 
 .sidebar-card {
@@ -44,6 +46,7 @@ st.markdown("""
     border-radius: 10px;
     border: 1px solid #e5e7eb;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -64,10 +67,10 @@ def check_login():
     with col2:
         st.markdown("""
         <div style="background:white;padding:30px;border-radius:12px;
-        border:1px solid #e5e7eb;box-shadow:0px 4px 12px rgba(0,0,0,0.05);">
+        border:1px solid #e5e7eb;">
         """, unsafe_allow_html=True)
 
-        st.markdown("### 🔐 Sign In")
+        st.markdown("### Sign In")
 
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
@@ -95,7 +98,7 @@ with st.sidebar:
 
     st.markdown(f"👤 {st.session_state.get('user_email','')}")
 
-    st.markdown("## 📌 Example Queries")
+    st.markdown("### Example Queries")
 
     examples = [
         "Total revenue by region",
@@ -105,25 +108,23 @@ with st.sidebar:
 
     for ex in examples:
         if st.button(ex):
-            st.session_state.query = ex
+            st.session_state.chat_history.append({"query": ex})
 
     st.markdown("---")
 
-    st.markdown("## 📊 Insights You Can Explore")
+    st.markdown("### Insights")
 
-    # Bullet list
     st.markdown("""
     <div class="sidebar-card">
-    <ul style="padding-left:18px;">
-    <li>💰 Revenue trends</li>
-    <li>📈 Profit drivers</li>
-    <li>🌍 Regional performance</li>
-    <li>🧾 Customer segmentation</li>
+    <ul>
+    <li>Revenue trends</li>
+    <li>Profit drivers</li>
+    <li>Regional performance</li>
+    <li>Customer segmentation</li>
     </ul>
     </div>
     """, unsafe_allow_html=True)
 
-    # Clickable insights
     insights = [
         "Revenue trends",
         "Profit drivers",
@@ -133,20 +134,20 @@ with st.sidebar:
 
     for item in insights:
         if st.button(item):
-            st.session_state.query = item
+            st.session_state.chat_history.append({"query": item})
 
     st.markdown("---")
 
-    if st.button("🧹 Clear Chat"):
+    if st.button("Clear Chat"):
         st.session_state.chat_history = []
         st.rerun()
 
-    if st.button("🚪 Logout"):
+    if st.button("Logout"):
         st.session_state.authenticated = False
         st.rerun()
 
 # ---------------- HEADER ---------------- #
-st.markdown("## 💰 AI Financial Analyst")
+st.markdown("## AI Financial Analyst")
 
 # ---------------- SCHEMA ---------------- #
 schema = """
@@ -160,65 +161,65 @@ financials(
 )
 """
 
-# ---------------- CHAT HISTORY ---------------- #
-st.markdown("### 💬 Conversation")
+# ---------------- PROCESS NEW QUERY ---------------- #
+if st.session_state.chat_history and "answer" not in st.session_state.chat_history[-1]:
 
-for chat in reversed(st.session_state.chat_history):
-
-    st.markdown(f'<div class="user-card"><b>You:</b> {chat["query"]}</div>', unsafe_allow_html=True)
-
-    st.markdown(f'<div class="card"><b>Answer:</b> {chat["answer"]}</div>', unsafe_allow_html=True)
-
-    if chat["table"]:
-        st.markdown(chat["table"])
-
-    if chat["insight"]:
-        st.markdown(f'<div class="card">{chat["insight"]}</div>', unsafe_allow_html=True)
-
-# ---------------- INPUT ---------------- #
-col1, col2, col3 = st.columns([10,1,1])
-
-with col1:
-    query = st.text_input("", placeholder="Ask your financial question...")
-
-with col2:
-    submit = st.button("➤")
-
-with col3:
-    reset = st.button("🔄")
-
-if reset:
-    st.session_state.chat_history = []
-    st.session_state.query = ""
-    st.rerun()
-
-# ---------------- RUN ---------------- #
-if query and submit:
+    last_query = st.session_state.chat_history[-1]["query"]
 
     with st.spinner(""):
-        output = run_agent(query, schema)
+        output = run_agent(last_query, schema)
 
     if "message" in output:
         answer = output["message"]
         table = None
         insight = None
-
     elif "error" in output:
         answer = output["error"]
         table = None
         insight = None
-
     else:
         answer = output["direct_answer"]
         table = output["table"]
         insight = output.get("insight")
 
-    # Store history
-    st.session_state.chat_history.append({
-        "query": query,
+    st.session_state.chat_history[-1].update({
         "answer": answer,
         "table": table,
         "insight": insight
     })
 
+# ---------------- CHAT DISPLAY ---------------- #
+st.markdown("### Conversation")
+
+for chat in st.session_state.chat_history:
+
+    st.markdown(f'<div class="user-card">{chat["query"]}</div>', unsafe_allow_html=True)
+
+    if "answer" in chat:
+        st.markdown(f'<div class="card">{chat["answer"]}</div>', unsafe_allow_html=True)
+
+        if chat.get("table"):
+            st.markdown(chat["table"])
+
+        if chat.get("insight"):
+            st.markdown(f'<div class="card">{chat["insight"]}</div>', unsafe_allow_html=True)
+
+# ---------------- INPUT ---------------- #
+col1, col2, col3 = st.columns([10,1,1])
+
+with col1:
+    user_input = st.text_input("", placeholder="Ask your financial question...")
+
+with col2:
+    send = st.button("➤")
+
+with col3:
+    refresh = st.button("↻")
+
+if refresh:
+    st.session_state.chat_history = []
+    st.rerun()
+
+if send and user_input:
+    st.session_state.chat_history.append({"query": user_input})
     st.rerun()
