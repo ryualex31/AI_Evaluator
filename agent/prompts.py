@@ -335,32 +335,24 @@ Keep concise.
 # ---------------- EVALUATION ---------------- #
 def evaluation_prompt(query, sql, data, insight):
     return f"""
-Evaluate response.
+You are an evaluation system for a financial AI assistant.
 
-QUESTION:
-{query}
+Evaluate the response based on:
+- accuracy (0-5)
+- coverage (0-5)
+- faithfulness (0-5)
+- clarity (0-5)
+- overall (0-5)
 
-SQL:
-{sql}
+Also provide a short reasoning.
 
-DATA:
-{data}
+STRICT RULES:
+- Return ONLY valid JSON
+- Do NOT include explanations outside JSON
+- Do NOT include markdown
+- Do NOT include text before or after JSON
 
-INSIGHT:
-{insight}
-
-Return STRICT JSON:
-
-{{
-  "accuracy": 0-10,
-  "coverage": 0-10,
-  "faithfulness": 0-10,
-  "clarity": 0-10,
-  "overall": 0-10,
-  "reason": "short explanation"
-}}
 """
-
 
 def direct_answer_prompt(query, data):
     return f"""

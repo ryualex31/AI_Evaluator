@@ -96,8 +96,7 @@ with st.sidebar:
     examples = [
         "How much was the revenue change month over month in 2024, and did we see a spike in Q4?",
         "Which region contributed the most to profit in 2024, and how does it compare to others?",
-        "Which product and customer segment combination is the most profitable, and why?",
-        "Which supplier is associated with the lowest profit margins, and what could be the reason?"
+        "Which product and customer segment combination is the most profitable, and why?"
     ]
 
     for i, ex in enumerate(examples):
@@ -135,11 +134,7 @@ if not st.session_state.messages:
         border:1px solid #e5e7eb;
         margin-bottom:10px;
     ">
-    🤖 <b>What this app does:</b><br>
-    Ask natural language questions about financial data — I generate SQL, analyze results, and provide insights instantly.
-
-    <br><br>
-
+    <br>
     💡 <b>You can ask:</b>
     <ul>
     <li>📈 Revenue and profit trends</li>
