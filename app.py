@@ -27,9 +27,12 @@ st.markdown("""
 
 .stChatMessage {
     padding: 12px !important;
-    border-radius: 10px;
+    border-radius: 12px;
 }
 
+[data-testid="stSidebar"] {
+    background-color: #f9fafb;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -53,7 +56,7 @@ def check_login():
         border:1px solid #e5e7eb;">
         """, unsafe_allow_html=True)
 
-        st.markdown("### Sign In")
+        st.markdown("### 🔐 Sign In")
 
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
@@ -81,12 +84,13 @@ with st.sidebar:
 
     st.markdown(f"👤 {st.session_state.get('user_email','')}")
 
-    st.markdown("### Example Queries")
+    st.markdown("### 🧪 Example Queries")
 
     examples = [
-        "Total revenue by region",
-        "Top 3 products by profit",
-        "Revenue trend over months"
+        "How much was the revenue change month over month in 2024, and did we see a spike in Q4?",
+        "Which region contributed the most to profit in 2024, and how does it compare to others?",
+        "Which product and customer segment combination is the most profitable, and why?",
+        "Which supplier is associated with the lowest profit margins, and what could be the reason?"
     ]
 
     for i, ex in enumerate(examples):
@@ -96,28 +100,24 @@ with st.sidebar:
 
     st.markdown("---")
 
-    st.markdown("### Insights")
-
-    insights = [
-        "Revenue trends",
-        "Profit drivers",
-        "Regional performance",
-        "Customer segmentation"
-    ]
-
-    for i, item in enumerate(insights):
-        if st.button(item, key=f"insight_{i}"):
-            st.session_state.messages = [{"role": "user", "content": item}]
-            st.rerun()
-
-    st.markdown("---")
-
     if st.button("🚪 Logout"):
         st.session_state.authenticated = False
         st.rerun()
 
 # ---------------- HEADER ---------------- #
-st.markdown("## AI Financial Analyst")
+st.markdown("## 📊 AI Financial Analyst")
+st.caption("Ask questions about revenue, profit, and business performance")
+
+# ---------------- EMPTY STATE ---------------- #
+if not st.session_state.messages:
+    st.markdown("""
+    ### 👋 Welcome!
+    
+    Try asking:
+    - 📈 Revenue trends over time  
+    - 🌍 Profit by region  
+    - 🧠 Key profit drivers  
+    """)
 
 # ---------------- SCHEMA ---------------- #
 schema = """
@@ -131,9 +131,14 @@ financials(
 )
 """
 
-# ---------------- DISPLAY CHAT ---------------- #
+# ---------------- CHAT DISPLAY ---------------- #
+avatar_map = {
+    "user": "🧑‍💼",
+    "assistant": "🤖"
+}
+
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
+    with st.chat_message(msg["role"], avatar=avatar_map[msg["role"]]):
         st.markdown(msg["content"])
 
 # ---------------- USER INPUT ---------------- #
@@ -141,20 +146,23 @@ user_input = st.chat_input("Ask your financial question...")
 
 if user_input:
 
-    # Show user message
+    # Store user message
     st.session_state.messages.append({
         "role": "user",
         "content": user_input
     })
 
-    with st.chat_message("user"):
+    # Display user message
+    with st.chat_message("user", avatar="🧑‍💼"):
         st.markdown(user_input)
 
     # Generate response
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
+    with st.chat_message("assistant", avatar="🤖"):
+
+        with st.spinner("🤖 Analyzing your data..."):
             output = run_agent(user_input, schema)
 
+        # Handle response
         if "message" in output:
             answer = output["message"]
             table = None
@@ -170,22 +178,37 @@ if user_input:
             table = output.get("table")
             insight = output.get("insight")
 
-        # Display answer
+        # Show answer
         st.markdown(answer)
 
-        # Table (if exists)
+        # Show table
         if table:
             try:
                 df = pd.read_html(table)[0]
+                st.markdown("### 📊 Data Snapshot")
                 st.dataframe(df, use_container_width=True)
             except:
                 st.markdown(table)
 
-        # Insight (if exists)
+        # Show insight (ONLY if meaningful)
         if insight:
-            st.info(f"💡 {insight}")
+            clean_answer = answer.lower().replace("$", "").replace(",", "").strip()
+            clean_insight = insight.lower().replace("$", "").replace(",", "").strip()
 
-    # Save assistant response (ONLY answer text for simplicity)
+            if clean_answer != clean_insight:
+                st.markdown(f"""
+                <div style="
+                    background-color:#eef6ff;
+                    padding:12px;
+                    border-radius:10px;
+                    border:1px solid #c7ddff;
+                    margin-top:10px;
+                ">
+                💡 <b>Insight:</b><br>{insight}
+                </div>
+                """, unsafe_allow_html=True)
+
+    # Save assistant message
     st.session_state.messages.append({
         "role": "assistant",
         "content": answer

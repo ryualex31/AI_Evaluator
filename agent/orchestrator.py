@@ -86,11 +86,6 @@ def run_agent(user_query, schema):
         direct_answer_prompt(user_query, preview_rows)
     )
 
-    # ---------------- SECONDARY ANSWER ---------------- #
-    answer = call_llm(
-        answer_prompt(user_query, preview_rows)
-    )
-
     # ---------------- TABLE ---------------- #
     table_md = to_markdown_table(columns, rows)
 
@@ -123,7 +118,6 @@ def run_agent(user_query, schema):
         "columns": columns,
         "rows_preview": preview_rows,
         "direct_answer": direct_answer,
-        "answer": answer,
         "insight_prompt": insight_prompt_used,
         "insight": insight,
         "evaluation": evaluation,
@@ -133,7 +127,6 @@ def run_agent(user_query, schema):
     # ---------------- FINAL RESPONSE ---------------- #
     return {
         "direct_answer": direct_answer,
-        "answer": answer,
         "table": table_md,
         "insight": insight,
         "evaluation": evaluation,
