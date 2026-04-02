@@ -1,21 +1,30 @@
-import sqlite3
+from agent.prompts import sql_prompt
 from utils.llm import call_llm
-from agent.prompts import generate_sql_prompt
+import sqlite3
+import os
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, "db/data.db")
 
 
 def generate_sql(query, schema):
-    prompt = generate_sql_prompt(query, schema)
-    return call_llm(prompt).strip()
+    prompt = sql_prompt(query, schema)
+    sql = call_llm(prompt)
+    return sql.strip().replace("```sql", "").replace("```", "")
 
 
 def execute_sql(query):
-    conn = sqlite3.connect("db/data.db")
-    cursor = conn.cursor()
-
     try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
         cursor.execute(query)
-        rows = cursor.fetchall()
+
         columns = [desc[0] for desc in cursor.description]
+        rows = cursor.fetchall()
+
+        conn.close()
         return columns, rows
+
     except Exception as e:
         return str(e)

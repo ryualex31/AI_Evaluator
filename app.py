@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
+import os
+import uuid
 from agent.orchestrator import run_agent
+from utils.logger import log_feedback
 
 # ---------------- CONFIG ---------------- #
 st.set_page_config(
@@ -8,51 +11,108 @@ st.set_page_config(
     layout="wide"
 )
 
+# ---------------- SESSION ---------------- #
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
+# ---------------- LOGIN ---------------- #
+def check_login():
+
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+
+    if st.session_state.authenticated:
+        return True
+
+    st.markdown("## 🔐 Login Required")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if (
+            username == os.getenv("APP_USERNAME")
+            and password == os.getenv("APP_PASSWORD")
+        ):
+            st.session_state.authenticated = True
+            st.success("Login successful!")
+            st.rerun()
+        else:
+            st.error("Invalid credentials")
+
+    return False
+
+
+if not check_login():
+    st.stop()
+
 # ---------------- STYLING ---------------- #
 st.markdown("""
 <style>
+body {
+    background-color: #f8fafc;
+}
+
 .main-title {
-    font-size: 2.2rem;
-    font-weight: 700;
+    font-size: 2rem;
+    font-weight: 600;
+    color: #111827;
 }
-.subtle {
+
+.subtitle {
     color: #6b7280;
+    margin-bottom: 20px;
 }
+
 .card {
-    padding: 1rem;
+    background-color: white;
+    padding: 18px;
     border-radius: 12px;
-    background-color: #f9fafb;
     border: 1px solid #e5e7eb;
+    box-shadow: 0px 2px 6px rgba(0,0,0,0.04);
 }
 </style>
 """, unsafe_allow_html=True)
 
+# ---------------- LOGOUT ---------------- #
+with st.sidebar:
+    if st.button("🚪 Logout"):
+        st.session_state.authenticated = False
+        st.rerun()
+
+# ---------------- SCHEMA ---------------- #
+schema = """
+financials(
+    date, month, year,
+    region, country,
+    product, category,
+    customer_type, supplier,
+    units_sold, discount,
+    revenue, cost, profit, profit_margin
+)
+"""
+
 # ---------------- HEADER ---------------- #
 st.markdown('<div class="main-title">💰 AI Financial Analyst</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtle">Ask finance questions and get instant insights</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Ask finance-related questions and get business insights instantly</div>', unsafe_allow_html=True)
 
-st.divider()
-
-# ---------------- SESSION STATE ---------------- #
-if "history" not in st.session_state:
-    st.session_state.history = []
-
+# ---------------- SESSION QUERY ---------------- #
 if "query" not in st.session_state:
     st.session_state.query = ""
 
 # ---------------- EXAMPLES ---------------- #
-st.markdown("### 💡 Try these")
-
-cols = st.columns(3)
+st.markdown("### 💡 Example Queries")
 
 examples = [
     "Total revenue by region",
     "Top 3 products by profit",
-    "Monthly revenue trend",
-    "Profit by category",
-    "Revenue in India",
-    "Which region performs best?"
+    "Revenue trend over months",
+    "Which region has highest profit?",
+    "Profit margin by category",
+    "Which customer segment is most valuable?"
 ]
+
+cols = st.columns(3)
 
 for i, ex in enumerate(examples):
     if cols[i % 3].button(ex):
@@ -60,75 +120,100 @@ for i, ex in enumerate(examples):
 
 # ---------------- INPUT ---------------- #
 query = st.text_input(
-    "Ask your question:",
+    "Ask your question",
     value=st.session_state.query,
-    placeholder="e.g. Show revenue trends by region"
+    placeholder="e.g. Top 3 products by profit"
 )
 
-# Schema
-schema = """
-financials(
-    date, month, year, region, country,
-    product, category, revenue, cost, profit, customer_type
-)
-"""
+run = st.button("Analyze")
 
-# ---------------- RUN ---------------- #
-if st.button("🚀 Analyze"):
+# ---------------- OUTPUT ---------------- #
+if run:
 
     if not query.strip():
-        st.info("Please enter a question.")
+        st.info("Please enter a query.")
     else:
         with st.spinner("Analyzing financial data..."):
             output = run_agent(query, schema)
 
-        # Save history
-        st.session_state.history.append((query, output))
-
-# ---------------- OUTPUT ---------------- #
-if st.session_state.history:
-
-    st.divider()
-    st.markdown("## 📊 Results")
-
-    # Show latest response
-    last_query, output = st.session_state.history[-1]
-
-    st.markdown(f"**🧑 Query:** {last_query}")
-
-    # Conversational responses
-    if "message" in output:
-        st.markdown(f"<div class='card'>{output['message']}</div>", unsafe_allow_html=True)
-
-    # Errors
-    elif "error" in output:
-        st.markdown(f"<div class='card'>⚠️ {output['error']}</div>", unsafe_allow_html=True)
-
-    # Success
-    else:
-        df = pd.DataFrame(output["rows"], columns=output["columns"])
-
-        col1, col2 = st.columns([2, 1])
-
-        # 📊 Table
-        with col1:
-            st.markdown("### 📈 Data")
-            st.dataframe(df, use_container_width=True, height=400)
-
-        # 🧠 Insight card
-        with col2:
-            st.markdown("### 🧠 Insight")
+        # 💬 Conversational
+        if "message" in output:
             st.markdown(
-                f"<div class='card'>{output['insight']}</div>",
+                f'<div class="card">{output["message"]}</div>',
                 unsafe_allow_html=True
             )
 
-        st.caption(f"Retries used: {output['retries']}")
+        # ❌ Error
+        elif "error" in output:
+            st.markdown(
+                f'<div class="card">⚠️ {output["error"]}</div>',
+                unsafe_allow_html=True
+            )
 
-# ---------------- HISTORY ---------------- #
-if len(st.session_state.history) > 1:
-    st.divider()
-    st.markdown("## 🕘 Previous Queries")
+        # ✅ Success
+        else:
 
-    for q, _ in reversed(st.session_state.history[:-1]):
-        st.markdown(f"- {q}")
+            # 🧾 DIRECT ANSWER
+            st.markdown("### 🧾 Answer")
+            st.markdown(
+                f'<div class="card"><b>{output["direct_answer"]}</b></div>',
+                unsafe_allow_html=True
+            )
+
+            # 📊 DATA
+            st.markdown("### 📊 Data")
+            st.markdown(output["table"])
+
+            # 🧠 INSIGHT
+            if output.get("insight"):
+                st.markdown("### 🧠 Insight")
+                st.markdown(
+                    f'<div class="card">{output["insight"]}</div>',
+                    unsafe_allow_html=True
+                )
+
+            # 🔍 EVALUATION (OPTIONAL)
+            if output.get("evaluation"):
+                with st.expander("🔍 Show Evaluation (Optional)"):
+
+                    eval_data = output["evaluation"]
+
+                    col1, col2, col3, col4 = st.columns(4)
+
+                    col1.metric("Accuracy", eval_data.get("accuracy"))
+                    col2.metric("Coverage", eval_data.get("coverage"))
+                    col3.metric("Faithfulness", eval_data.get("faithfulness"))
+                    col4.metric("Clarity", eval_data.get("clarity"))
+
+                    st.markdown(f"**Overall Score:** {eval_data.get('overall')}")
+
+                    if eval_data.get("reason"):
+                        st.markdown(
+                            f'<div class="card">{eval_data["reason"]}</div>',
+                            unsafe_allow_html=True
+                        )
+
+            # 👍 👎 FEEDBACK
+            st.markdown("### 👍 Feedback")
+
+            col1, col2 = st.columns(2)
+
+            if col1.button("👍 Helpful"):
+                log_feedback({
+                    "session_id": st.session_state.session_id,
+                    "query": query,
+                    "response": output.get("direct_answer"),
+                    "feedback": "positive"
+                })
+                st.success("Thanks for your feedback!")
+
+            if col2.button("👎 Not Helpful"):
+                log_feedback({
+                    "session_id": st.session_state.session_id,
+                    "query": query,
+                    "response": output.get("direct_answer"),
+                    "feedback": "negative"
+                })
+                st.warning("Thanks! We'll improve.")
+
+            st.caption(f"Retries used: {output['retries']}")
