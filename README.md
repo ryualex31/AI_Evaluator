@@ -61,6 +61,72 @@ AZURE_OPENAI_API_VERSION=2024-02-15-preview
 
 ---
 
+# 📝 Logging & Evaluation
+
+The application includes a backend logging system to capture interactions and enable continuous improvement.
+
+### 📊 What is Logged
+
+For every user query, the system logs:
+
+- User query  
+- Generated SQL query  
+- Data preview (query results)  
+- Direct answer  
+- Generated insights  
+- Evaluation metrics  
+- User feedback (👍 / 👎)  
+
+---
+
+### 🧠 Evaluation Metrics (LLM-as-a-Judge)
+
+Each response is evaluated using an LLM-based evaluator to measure quality:
+
+| Metric        | Description |
+|--------------|------------|
+| Accuracy     | Does the response correctly reflect the data? |
+| Coverage     | Does it fully answer the user’s question? |
+| Faithfulness | Is the response grounded in the data (no hallucination)? |
+| Clarity      | Is the response easy to understand? |
+| Overall      | Overall quality score |
+
+---
+
+### ⚙️ How It Works
+
+1. After generating the answer and insights, the system calls an evaluation prompt  
+2. The LLM returns structured scores (0–5)  
+3. Results are parsed and stored in logs  
+
+---
+
+### 🎯 Purpose of Logging
+
+- Monitor response quality  
+- Identify failure patterns in SQL generation  
+- Improve prompts and system behavior  
+- Enable future analytics dashboards  
+
+---
+
+### 📦 Storage
+
+Currently, logs are stored locally (JSON / SQLite depending on configuration).
+
+⚠️ In production, this can be extended to:
+- Cloud databases (Postgres, MongoDB)  
+- Analytics pipelines  
+- Monitoring dashboards  
+
+---
+
+### 🔮 Future Enhancements
+
+- Evaluation dashboard (visualize metrics over time)  
+- Confidence scoring for responses  
+- Automatic prompt tuning using feedback  
+
 ## 👤 Author
 
 Ayush Gupta
