@@ -4,6 +4,7 @@ import uuid
 import re
 
 from agent.orchestrator import run_agent
+from utils.logger import log_feedback
 
 # ---------------- CONFIG ---------------- #
 st.set_page_config(
@@ -100,6 +101,10 @@ with st.sidebar:
 
     st.markdown("---")
 
+    if st.button("🔄 Reset Chat"):
+        st.session_state.messages = []
+        st.rerun()
+
     if st.button("🚪 Logout"):
         st.session_state.authenticated = False
         st.rerun()
@@ -152,7 +157,6 @@ if user_input:
         "content": user_input
     })
 
-    # Display user message
     with st.chat_message("user", avatar="🧑‍💼"):
         st.markdown(user_input)
 
@@ -190,7 +194,7 @@ if user_input:
             except:
                 st.markdown(table)
 
-        # Show insight (ONLY if meaningful)
+        # Show insight (only if meaningful)
         if insight:
             clean_answer = answer.lower().replace("$", "").replace(",", "").strip()
             clean_insight = insight.lower().replace("$", "").replace(",", "").strip()
@@ -207,6 +211,29 @@ if user_input:
                 💡 <b>Insight:</b><br>{insight}
                 </div>
                 """, unsafe_allow_html=True)
+
+        # ---------------- FEEDBACK ---------------- #
+        st.markdown("##### Was this helpful?")
+
+        col1, col2, col3 = st.columns([1,1,8])
+
+        with col1:
+            if st.button("👍", key=f"up_{len(st.session_state.messages)}"):
+                log_feedback({
+                    "query": user_input,
+                    "response": answer,
+                    "feedback": "up"
+                })
+                st.success("Feedback recorded")
+
+        with col2:
+            if st.button("👎", key=f"down_{len(st.session_state.messages)}"):
+                log_feedback({
+                    "query": user_input,
+                    "response": answer,
+                    "feedback": "down"
+                })
+                st.warning("Feedback recorded")
 
     # Save assistant message
     st.session_state.messages.append({
