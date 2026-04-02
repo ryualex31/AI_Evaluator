@@ -136,6 +136,49 @@ financials(
 )
 """
 
+# ---------------- CHART HELPER ---------------- #
+def generate_chart(df, user_query):
+    query = user_query.lower()
+
+    try:
+        # ----------- TIME SERIES ----------- #
+        if "month" in df.columns or "date" in df.columns:
+            if any(word in query for word in ["trend", "month", "over time", "q4"]):
+
+                x_col = "month" if "month" in df.columns else "date"
+                y_col = None
+
+                for col in ["revenue", "profit"]:
+                    if col in df.columns:
+                        y_col = col
+                        break
+
+                if x_col and y_col:
+                    st.markdown("### 📈 Trend Analysis")
+                    st.line_chart(df.set_index(x_col)[y_col])
+
+        # ----------- BAR CHART ----------- #
+        elif any(col in df.columns for col in ["region", "product", "supplier"]):
+
+            x_col = None
+            for col in ["region", "product", "supplier"]:
+                if col in df.columns:
+                    x_col = col
+                    break
+
+            y_col = None
+            for col in ["revenue", "profit"]:
+                if col in df.columns:
+                    y_col = col
+                    break
+
+            if x_col and y_col:
+                st.markdown("### 📊 Comparison View")
+                st.bar_chart(df.set_index(x_col)[y_col])
+
+    except Exception:
+        pass
+
 # ---------------- CHAT DISPLAY ---------------- #
 avatar_map = {
     "user": "🧑‍💼",
@@ -151,7 +194,6 @@ user_input = st.chat_input("Ask your financial question...")
 
 if user_input:
 
-    # Store user message
     st.session_state.messages.append({
         "role": "user",
         "content": user_input
@@ -160,7 +202,6 @@ if user_input:
     with st.chat_message("user", avatar="🧑‍💼"):
         st.markdown(user_input)
 
-    # Generate response
     with st.chat_message("assistant", avatar="🤖"):
 
         with st.spinner("🤖 Analyzing your data..."):
@@ -182,19 +223,24 @@ if user_input:
             table = output.get("table")
             insight = output.get("insight")
 
-        # Show answer
+        # Answer
         st.markdown(answer)
 
-        # Show table
+        # Table + Chart
         if table:
             try:
                 df = pd.read_html(table)[0]
+
                 st.markdown("### 📊 Data Snapshot")
                 st.dataframe(df, use_container_width=True)
+
+                # 🔥 Auto chart
+                generate_chart(df, user_input)
+
             except:
                 st.markdown(table)
 
-        # Show insight (only if meaningful)
+        # Insight (filtered)
         if insight:
             clean_answer = answer.lower().replace("$", "").replace(",", "").strip()
             clean_insight = insight.lower().replace("$", "").replace(",", "").strip()
@@ -235,7 +281,6 @@ if user_input:
                 })
                 st.warning("Feedback recorded")
 
-    # Save assistant message
     st.session_state.messages.append({
         "role": "assistant",
         "content": answer
