@@ -4,47 +4,30 @@ import uuid
 import re
 
 from agent.orchestrator import run_agent
-from utils.logger import log_feedback
 
 # ---------------- CONFIG ---------------- #
-st.set_page_config(page_title="AI Financial Analyst", layout="wide")
+st.set_page_config(
+    page_title="AI Financial Analyst",
+    layout="wide"
+)
 
 # ---------------- SESSION ---------------- #
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
 # ---------------- STYLING ---------------- #
 st.markdown("""
 <style>
-
 .block-container {
     padding-top: 2rem;
 }
 
-.card {
-    background-color: #ffffff;
-    color: #111827;
-    padding: 14px;
+.stChatMessage {
+    padding: 12px !important;
     border-radius: 10px;
-    border: 1px solid #e5e7eb;
-    margin-bottom: 8px;
-}
-
-.user-card {
-    background-color: #f1f5f9;
-    padding: 10px;
-    border-radius: 10px;
-    margin-bottom: 4px;
-}
-
-.sidebar-card {
-    background-color: #f9fafb;
-    padding: 15px;
-    border-radius: 10px;
-    border: 1px solid #e5e7eb;
 }
 
 </style>
@@ -75,7 +58,7 @@ def check_login():
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
 
-        if st.button("→"):
+        if st.button("Login"):
             if not email or not password:
                 st.error("Please fill all fields")
             elif not is_valid_email(email):
@@ -106,24 +89,14 @@ with st.sidebar:
         "Revenue trend over months"
     ]
 
-    for ex in examples:
-        if st.button(ex):
-            st.session_state.chat_history.append({"query": ex})
+    for i, ex in enumerate(examples):
+        if st.button(ex, key=f"example_{i}"):
+            st.session_state.messages = [{"role": "user", "content": ex}]
+            st.rerun()
 
     st.markdown("---")
 
     st.markdown("### Insights")
-
-    st.markdown("""
-    <div class="sidebar-card">
-    <ul>
-    <li>Revenue trends</li>
-    <li>Profit drivers</li>
-    <li>Regional performance</li>
-    <li>Customer segmentation</li>
-    </ul>
-    </div>
-    """, unsafe_allow_html=True)
 
     insights = [
         "Revenue trends",
@@ -132,17 +105,14 @@ with st.sidebar:
         "Customer segmentation"
     ]
 
-    for item in insights:
-        if st.button(item):
-            st.session_state.chat_history.append({"query": item})
+    for i, item in enumerate(insights):
+        if st.button(item, key=f"insight_{i}"):
+            st.session_state.messages = [{"role": "user", "content": item}]
+            st.rerun()
 
     st.markdown("---")
 
-    if st.button("Clear Chat"):
-        st.session_state.chat_history = []
-        st.rerun()
-
-    if st.button("Logout"):
+    if st.button("🚪 Logout"):
         st.session_state.authenticated = False
         st.rerun()
 
@@ -161,65 +131,62 @@ financials(
 )
 """
 
-# ---------------- PROCESS NEW QUERY ---------------- #
-if st.session_state.chat_history and "answer" not in st.session_state.chat_history[-1]:
+# ---------------- DISPLAY CHAT ---------------- #
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-    last_query = st.session_state.chat_history[-1]["query"]
+# ---------------- USER INPUT ---------------- #
+user_input = st.chat_input("Ask your financial question...")
 
-    with st.spinner(""):
-        output = run_agent(last_query, schema)
+if user_input:
 
-    if "message" in output:
-        answer = output["message"]
-        table = None
-        insight = None
-    elif "error" in output:
-        answer = output["error"]
-        table = None
-        insight = None
-    else:
-        answer = output["direct_answer"]
-        table = output["table"]
-        insight = output.get("insight")
-
-    st.session_state.chat_history[-1].update({
-        "answer": answer,
-        "table": table,
-        "insight": insight
+    # Show user message
+    st.session_state.messages.append({
+        "role": "user",
+        "content": user_input
     })
 
-# ---------------- CHAT DISPLAY ---------------- #
-st.markdown("### Conversation")
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
-for chat in st.session_state.chat_history:
+    # Generate response
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            output = run_agent(user_input, schema)
 
-    st.markdown(f'<div class="user-card">{chat["query"]}</div>', unsafe_allow_html=True)
+        if "message" in output:
+            answer = output["message"]
+            table = None
+            insight = None
 
-    if "answer" in chat:
-        st.markdown(f'<div class="card">{chat["answer"]}</div>', unsafe_allow_html=True)
+        elif "error" in output:
+            answer = output["error"]
+            table = None
+            insight = None
 
-        if chat.get("table"):
-            st.markdown(chat["table"])
+        else:
+            answer = output["direct_answer"]
+            table = output.get("table")
+            insight = output.get("insight")
 
-        if chat.get("insight"):
-            st.markdown(f'<div class="card">{chat["insight"]}</div>', unsafe_allow_html=True)
+        # Display answer
+        st.markdown(answer)
 
-# ---------------- INPUT ---------------- #
-col1, col2, col3 = st.columns([10,1,1])
+        # Table (if exists)
+        if table:
+            try:
+                df = pd.read_html(table)[0]
+                st.dataframe(df, use_container_width=True)
+            except:
+                st.markdown(table)
 
-with col1:
-    user_input = st.text_input("", placeholder="Ask your financial question...")
+        # Insight (if exists)
+        if insight:
+            st.info(f"💡 {insight}")
 
-with col2:
-    send = st.button("➤")
-
-with col3:
-    refresh = st.button("↻")
-
-if refresh:
-    st.session_state.chat_history = []
-    st.rerun()
-
-if send and user_input:
-    st.session_state.chat_history.append({"query": user_input})
-    st.rerun()
+    # Save assistant response (ONLY answer text for simplicity)
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": answer
+    })
