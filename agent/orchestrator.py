@@ -3,7 +3,6 @@ from agent.tools import generate_sql, execute_sql
 from agent.prompts import (
     fix_sql_prompt,
     insight_prompt,
-    answer_prompt,
     direct_answer_prompt,
     sql_prompt,
     non_finance_prompt
