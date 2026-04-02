@@ -19,6 +19,12 @@ if "session_id" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+if "pending_query" not in st.session_state:
+    st.session_state.pending_query = None
+
+if "show_eval" not in st.session_state:
+    st.session_state.show_eval = False
+
 # ---------------- STYLING ---------------- #
 st.markdown("""
 <style>
@@ -96,13 +102,20 @@ with st.sidebar:
 
     for i, ex in enumerate(examples):
         if st.button(ex, key=f"example_{i}"):
-            st.session_state.messages = [{"role": "user", "content": ex}]
+            st.session_state.pending_query = ex
             st.rerun()
+
+    st.markdown("---")
+
+    # ✅ Evaluation toggle
+    show_eval = st.toggle("🧠 Show Evaluation Metrics")
+    st.session_state.show_eval = show_eval
 
     st.markdown("---")
 
     if st.button("🔄 Reset Chat"):
         st.session_state.messages = []
+        st.session_state.pending_query = None
         st.rerun()
 
     if st.button("🚪 Logout"):
@@ -111,18 +124,31 @@ with st.sidebar:
 
 # ---------------- HEADER ---------------- #
 st.markdown("## 📊 AI Financial Analyst")
-st.caption("Ask questions about revenue, profit, and business performance")
 
-# ---------------- EMPTY STATE ---------------- #
+# ---------------- INTRO ---------------- #
 if not st.session_state.messages:
     st.markdown("""
-    ### 👋 Welcome!
-    
-    Try asking:
-    - 📈 Revenue trends over time  
-    - 🌍 Profit by region  
-    - 🧠 Key profit drivers  
-    """)
+    <div style="
+        background-color:#f8fafc;
+        padding:14px;
+        border-radius:10px;
+        border:1px solid #e5e7eb;
+        margin-bottom:10px;
+    ">
+    🤖 <b>What this app does:</b><br>
+    Ask natural language questions about financial data — I generate SQL, analyze results, and provide insights instantly.
+
+    <br><br>
+
+    💡 <b>You can ask:</b>
+    <ul>
+    <li>📈 Revenue and profit trends</li>
+    <li>🌍 Regional performance comparisons</li>
+    <li>🧠 Profit drivers and business insights</li>
+    <li>📊 Supplier and cost analysis</li>
+    </ul>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ---------------- SCHEMA ---------------- #
 schema = """
@@ -141,42 +167,26 @@ def generate_chart(df, user_query):
     query = user_query.lower()
 
     try:
-        # ----------- TIME SERIES ----------- #
         if "month" in df.columns or "date" in df.columns:
             if any(word in query for word in ["trend", "month", "over time", "q4"]):
-
                 x_col = "month" if "month" in df.columns else "date"
-                y_col = None
 
                 for col in ["revenue", "profit"]:
                     if col in df.columns:
-                        y_col = col
-                        break
+                        st.markdown("### 📈 Trend Analysis")
+                        st.line_chart(df.set_index(x_col)[col])
+                        return
 
-                if x_col and y_col:
-                    st.markdown("### 📈 Trend Analysis")
-                    st.line_chart(df.set_index(x_col)[y_col])
-
-        # ----------- BAR CHART ----------- #
         elif any(col in df.columns for col in ["region", "product", "supplier"]):
+            for x_col in ["region", "product", "supplier"]:
+                if x_col in df.columns:
+                    for col in ["revenue", "profit"]:
+                        if col in df.columns:
+                            st.markdown("### 📊 Comparison View")
+                            st.bar_chart(df.set_index(x_col)[col])
+                            return
 
-            x_col = None
-            for col in ["region", "product", "supplier"]:
-                if col in df.columns:
-                    x_col = col
-                    break
-
-            y_col = None
-            for col in ["revenue", "profit"]:
-                if col in df.columns:
-                    y_col = col
-                    break
-
-            if x_col and y_col:
-                st.markdown("### 📊 Comparison View")
-                st.bar_chart(df.set_index(x_col)[y_col])
-
-    except Exception:
+    except:
         pass
 
 # ---------------- CHAT DISPLAY ---------------- #
@@ -189,9 +199,14 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar=avatar_map[msg["role"]]):
         st.markdown(msg["content"])
 
-# ---------------- USER INPUT ---------------- #
+# ---------------- INPUT ---------------- #
 user_input = st.chat_input("Ask your financial question...")
 
+if st.session_state.pending_query:
+    user_input = st.session_state.pending_query
+    st.session_state.pending_query = None
+
+# ---------------- PROCESS ---------------- #
 if user_input:
 
     st.session_state.messages.append({
@@ -207,26 +222,21 @@ if user_input:
         with st.spinner("🤖 Analyzing your data..."):
             output = run_agent(user_input, schema)
 
-        # Handle response
         if "message" in output:
             answer = output["message"]
             table = None
             insight = None
-
         elif "error" in output:
             answer = output["error"]
             table = None
             insight = None
-
         else:
             answer = output["direct_answer"]
             table = output.get("table")
             insight = output.get("insight")
 
-        # Answer
         st.markdown(answer)
 
-        # Table + Chart
         if table:
             try:
                 df = pd.read_html(table)[0]
@@ -234,13 +244,11 @@ if user_input:
                 st.markdown("### 📊 Data Snapshot")
                 st.dataframe(df, use_container_width=True)
 
-                # 🔥 Auto chart
                 generate_chart(df, user_input)
 
             except:
                 st.markdown(table)
 
-        # Insight (filtered)
         if insight:
             clean_answer = answer.lower().replace("$", "").replace(",", "").strip()
             clean_insight = insight.lower().replace("$", "").replace(",", "").strip()
@@ -258,9 +266,30 @@ if user_input:
                 </div>
                 """, unsafe_allow_html=True)
 
+        # ---------------- EVALUATION PANEL ---------------- #
+        if st.session_state.show_eval and "evaluation" in output:
+
+            evaluation = output["evaluation"]
+
+            st.markdown("### 🧠 Evaluation Metrics")
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric("Correctness", evaluation.get("correctness", "N/A"))
+
+            with col2:
+                st.metric("Coverage", evaluation.get("coverage", "N/A"))
+
+            with col3:
+                st.metric("Faithfulness", evaluation.get("faithfulness", "N/A"))
+
+            if evaluation.get("reasoning"):
+                with st.expander("🔍 Detailed Evaluation"):
+                    st.markdown(evaluation["reasoning"])
+
         # ---------------- FEEDBACK ---------------- #
         st.markdown("##### Was this helpful?")
-
         col1, col2, col3 = st.columns([1,1,8])
 
         with col1:

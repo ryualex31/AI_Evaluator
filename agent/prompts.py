@@ -296,12 +296,14 @@ QUESTION:
 # ---------------- INSIGHT ---------------- #
 def insight_prompt(query, data):
     return f"""
-Provide short business insight ONLY if needed.
+Provide short business insights ONLY if needed.
 
 RULES:
-- 2–3 sentences max
-- No sections
+- 2-3 insights based on data
+- use bullets for each insight
 - No fluff
+- do not repeat the direct answer
+- if there's no insight - do no add anything beyond the direct answer
 
 DATA:
 {data}
