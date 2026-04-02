@@ -285,7 +285,8 @@ User:
 "{query}"
 
 THINK:
-- Respond politely
+- Respond politely and do not engage in non-finance topics
+- If the query is not finance-related, gently apologise and redirect to finance topics
 - Redirect to finance
 
 RULES:

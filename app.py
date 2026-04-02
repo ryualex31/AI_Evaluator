@@ -28,18 +28,9 @@ if "show_eval" not in st.session_state:
 # ---------------- STYLING ---------------- #
 st.markdown("""
 <style>
-.block-container {
-    padding-top: 2rem;
-}
-
-.stChatMessage {
-    padding: 12px !important;
-    border-radius: 12px;
-}
-
-[data-testid="stSidebar"] {
-    background-color: #f9fafb;
-}
+.block-container { padding-top: 2rem; }
+.stChatMessage { padding: 12px !important; border-radius: 12px; }
+[data-testid="stSidebar"] { background-color: #f9fafb; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -106,7 +97,11 @@ with st.sidebar:
 
     st.markdown("---")
 
-    st.session_state.show_eval = st.toggle("🧠 Show Evaluation Metrics")
+    # ✅ FIXED toggle persistence
+    st.session_state.show_eval = st.toggle(
+        "🧠 Show Evaluation Metrics",
+        value=st.session_state.show_eval
+    )
 
     st.markdown("---")
 
@@ -154,7 +149,7 @@ financials(
 )
 """
 
-# ---------------- CHART HELPER ---------------- #
+# ---------------- CHART ---------------- #
 def generate_chart(df, user_query):
     query = user_query.lower()
 
@@ -210,7 +205,7 @@ if user_input:
         answer = output.get("direct_answer") or output.get("message") or output.get("error")
         table = output.get("table")
         insight = output.get("insight")
-        evaluation = output.get("evaluation")
+        evaluation = output.get("evaluation", {})  # ✅ FIX
 
         st.markdown(answer)
 
@@ -225,16 +220,15 @@ if user_input:
                 st.markdown(table)
 
         # Insight
-        if insight:
-            if insight.strip().upper() != "NONE":
-                st.markdown(f"""
-                <div style="background:#eef6ff;padding:12px;border-radius:10px;border:1px solid #c7ddff;margin-top:10px;">
-                💡 <b>Insight:</b><br>{insight}
-                </div>
-                """, unsafe_allow_html=True)
+        if insight and insight.strip().upper() != "NONE":
+            st.markdown(f"""
+            <div style="background:#eef6ff;padding:12px;border-radius:10px;border:1px solid #c7ddff;margin-top:10px;">
+            💡 <b>Insight:</b><br>{insight}
+            </div>
+            """, unsafe_allow_html=True)
 
         # ---------------- EVALUATION ---------------- #
-        if st.session_state.show_eval and evaluation:
+        if st.session_state.show_eval and evaluation is not None:
 
             st.markdown("### 🧠 Evaluation Metrics")
 
