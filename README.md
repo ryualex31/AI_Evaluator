@@ -1,6 +1,6 @@
 # 📊 AI Financial Analyst
 
-AI-powered app that lets you query financial data using natural language and get instant answers and insights.
+AI-powered application that allows users to query financial data using natural language and receive **accurate answers, SQL-backed insights, and business intelligence** instantly.
 
 ---
 
@@ -8,18 +8,24 @@ AI-powered app that lets you query financial data using natural language and get
 
 👉 https://aicasestudy.azurewebsites.net/
 
+---
 
-### 🔐 Lightweight Login
+## 🔐 Lightweight Login
 
-- Email-based login for session simulation  
-- Enables personalized interaction  
-- Placeholder for production-grade authentication
+* Email-based login for session simulation
+* Enables personalized interaction
+* Placeholder for production-grade authentication
+
+---
 
 ## ✨ Features
 
-* 💬 Natural language → SQL
-* 📊 Instant data analysis
-* 💡 Business insights generation
+* 💬 Natural Language → SQL conversion
+* 📊 Instant data retrieval & visualization
+* 💡 AI-generated business insights
+* 🔁 Automatic SQL correction (retry mechanism)
+* 🧠 LLM-based response evaluation
+* 📝 Persistent logging for observability
 
 ---
 
@@ -28,6 +34,8 @@ AI-powered app that lets you query financial data using natural language and get
 * Revenue trend over months
 * Top products by profit
 * Regional performance comparison
+* Monthly growth rate analysis
+* Profit margin by category
 
 ---
 
@@ -41,9 +49,11 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Create `.env`:
+### 🔑 Environment Setup
 
-```
+Create a `.env` file:
+
+```env
 AZURE_OPENAI_API_KEY=your_key
 AZURE_OPENAI_ENDPOINT=your_endpoint
 AZURE_OPENAI_DEPLOYMENT=gpt-4o
@@ -54,79 +64,145 @@ AZURE_OPENAI_API_VERSION=2024-02-15-preview
 
 ## 🧰 Tech Stack
 
-* Streamlit
-* Python
-* SQLite
-* Azure OpenAI
+* **Frontend**: Streamlit
+* **Backend**: Python
+* **LLM**: Azure OpenAI
+* **Database**: SQLite
+* **Architecture**: LLM-powered agent pipeline
+
+---
+
+# 🧠 System Architecture
+
+The system follows a modular **LLM-agent pipeline**:
+
+1. **Intent Classification** → Determines if query is financial
+2. **SQL Generation** → Converts NL → SQL using LLM
+3. **Execution Engine** → Runs SQL on structured data
+4. **Retry Logic** → Fixes invalid SQL automatically
+5. **Response Generation** → Direct answer + insights
+6. **Evaluation Layer** → LLM-as-a-judge scoring
+7. **Logging Layer** → Stores all interactions
 
 ---
 
 # 📝 Logging & Evaluation
 
-The application includes a backend logging system to capture interactions and enable continuous improvement.
-
-### 📊 What is Logged
-
-For every user query, the system logs:
-
-- User query  
-- Generated SQL query  
-- Data preview (query results)  
-- Direct answer  
-- Generated insights  
-- Evaluation metrics  
-- User feedback (👍 / 👎)  
+The application includes a **production-ready SQLite-based logging system** to capture interactions, enable evaluation, and support continuous improvement.
 
 ---
 
-### 🧠 Evaluation Metrics (LLM-as-a-Judge)
+## 📊 What is Logged
 
-Each response is evaluated using an LLM-based evaluator to measure quality:
+For every user query, the system captures:
 
-| Metric        | Description |
-|--------------|------------|
+* User query
+* Intent classification
+* Generated SQL query
+* SQL prompt used
+* Query results (preview)
+* Direct answer
+* Generated insights
+* Evaluation metrics (LLM-based)
+* Retry attempts
+* Errors (if any)
+* User feedback (👍 / 👎)
+
+---
+
+## 🧠 Evaluation Metrics (LLM-as-a-Judge)
+
+Each response is evaluated using an LLM-based evaluator:
+
+| Metric       | Description                                   |
+| ------------ | --------------------------------------------- |
 | Accuracy     | Does the response correctly reflect the data? |
-| Coverage     | Does it fully answer the user’s question? |
-| Faithfulness | Is the response grounded in the data (no hallucination)? |
-| Clarity      | Is the response easy to understand? |
-| Overall      | Overall quality score |
+| Coverage     | Does it fully answer the user’s question?     |
+| Faithfulness | Is the response grounded in the data?         |
+| Clarity      | Is the response easy to understand?           |
+| Overall      | Overall quality score                         |
 
 ---
 
-### ⚙️ How It Works
+## ⚙️ Logging Architecture
 
-1. After generating the answer and insights, the system calls an evaluation prompt  
-2. The LLM returns structured scores (0–5)  
-3. Results are parsed and stored in logs  
+* Logs are stored in a **SQLite database (`logs.db`)**
 
----
+* Data is stored as structured JSON for flexibility
 
-### 🎯 Purpose of Logging
+* Tables:
 
-- Monitor response quality  
-- Identify failure patterns in SQL generation  
-- Improve prompts and system behavior  
-- Enable future analytics dashboards  
+  * `logs` → interaction data
+  * `feedback` → user feedback
+
+* Database is **auto-created at runtime** (no setup required)
 
 ---
 
-### 📦 Storage
+## 🔐 Environment Configuration (IMPORTANT)
 
-Currently, logs are stored locally (JSON / SQLite depending on configuration).
+To ensure logs persist after deployment, configure:
 
-⚠️ In production, this can be extended to:
-- Cloud databases (Postgres, MongoDB)  
-- Analytics pipelines  
-- Monitoring dashboards  
+```bash
+DB_PATH=/home/site/wwwroot/logs.db
+```
+
+### 📍 Azure Setup
+
+1. Go to **Azure Web App**
+2. Navigate to **Settings → Environment Variables**
+3. Add:
+
+   * **Name**: `DB_PATH`
+   * **Value**: `/home/site/wwwroot/logs.db`
+4. Save and restart the app
 
 ---
 
-### 🔮 Future Enhancements
+## 🧠 Why This Matters
 
-- Evaluation dashboard (visualize metrics over time)  
-- Confidence scoring for responses  
-- Automatic prompt tuning using feedback  
+Azure Web Apps use a partially **ephemeral filesystem**:
+
+| Path        | Behavior           |
+| ----------- | ------------------ |
+| `/home/...` | ✅ Persistent       |
+| Other paths | ❌ Reset on restart |
+
+Without this configuration, logs may be lost after redeployments.
+
+---
+
+## 🎯 Purpose of Logging
+
+* Monitor response quality
+* Debug SQL generation failures
+* Track LLM performance
+* Improve prompts and system behavior
+* Enable evaluation-driven development
+
+---
+
+## 📦 Storage Strategy
+
+* **Current**: SQLite (lightweight, persistent, zero setup)
+* **Future-ready for**:
+
+  * Postgres / Cloud DB
+  * Analytics dashboards
+  * Monitoring pipelines
+
+---
+
+## 🔮 Future Enhancements
+
+* 📊 Evaluation dashboard (metrics over time)
+* 🔍 Failure analysis (low-score queries)
+* ⚡ Real-time monitoring
+* 🤖 Automated prompt optimization
+
+---
 
 ## 👤 Author
 
-Ayush Gupta
+**Ayush Gupta**
+AI Consultant
