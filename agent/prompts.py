@@ -219,14 +219,28 @@ def summary_prompt(query, data):
     return f"""
 You are a financial analyst.
 
-THINK:
-- Identify key takeaway
-- Compare if needed
+TASK:
+Provide a concise answer to the question.
 
 RULES:
 - Max 2 sentences
-- No exaggeration
-- No vague words
+- Be factual and direct
+- Answer the question clearly
+- Include key entities (region/product/etc)
+- NO interpretation or reasoning
+
+GOOD EXAMPLE:
+
+DATA:
+[("Asia-Pacific", 30644544), ("North America", 28203600)]
+
+QUESTION:
+Which region contributed the most?
+
+OUTPUT:
+Asia-Pacific contributed the most, followed by North America.
+
+---
 
 DATA:
 {data}
@@ -235,6 +249,42 @@ QUESTION:
 {query}
 
 SUMMARY:
+"""
+
+def insight_prompt(query, data):
+    return f"""
+You are a senior financial analyst.
+
+TASK:
+Generate business insights from the data.
+
+RULES:
+- Max 2 insights
+- Each insight = 1 line
+- Use bullet format (- ...)
+- DO NOT restate the answer
+- DO NOT repeat rankings
+- Focus on interpretation and implications
+- Use words like: suggests, indicates, signals
+
+GOOD EXAMPLE:
+
+DATA:
+[("Asia-Pacific", 30644544), ("North America", 28203600), ("Europe", 23465175)]
+
+OUTPUT:
+- Asia-Pacific’s strong performance suggests higher demand or better market penetration.
+- Europe’s lower contribution indicates potential for growth or underperformance.
+
+---
+
+DATA:
+{data}
+
+QUESTION:
+{query}
+
+INSIGHT:
 """
 
 
@@ -316,4 +366,38 @@ RULES:
 - No harsh refusal
 
 RESPONSE:
+"""
+
+def chart_prompt(query, columns, data):
+    return f"""
+You are a data visualization expert.
+
+INPUT:
+Query: {query}
+Columns: {columns}
+Data: {data}
+
+TASK:
+Choose the best chart.
+
+RULES:
+- If multiple rows → ALWAYS generate a chart
+- If categorical column exists → use bar chart
+- If time column exists → use line chart
+- If proportions → use pie chart (max 5 categories)
+
+SPECIAL RULE:
+- If query contains "which", "compare", "most", "least", "top" → use bar chart
+
+IMPORTANT:
+- Use EXACT column names
+- Select ONE x and ONE y
+
+OUTPUT (JSON ONLY):
+{{
+  "type": "line | bar | area | pie",
+  "x": "column_name",
+  "y": "column_name",
+  "reason": "short reason"
+}}
 """
