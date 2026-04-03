@@ -105,24 +105,49 @@ with st.sidebar:
 
 # ---------------- HEADER ---------------- #
 st.markdown("## 📊 AI Financial Analyst")
+st.caption("Analyze business performance using natural language queries")
 
 # ---------------- INTRO ---------------- #
 if not st.session_state.messages:
     st.markdown("""
     <div style="
         background-color:#f8fafc;
-        padding:14px;
+        padding:16px;
         border-radius:10px;
         border:1px solid #e5e7eb;
-        margin-bottom:10px;
+        margin-bottom:12px;
     ">
-    💡 <b>You can ask:</b>
+
+    📊 <b>AI Financial Analyst for a Global Business</b><br><br>
+
+    You are analyzing a <b>global business dataset</b> covering products, suppliers, customers, and regions.
+
+    <br>
+
+    <b>📊 What data is available:</b>
     <ul>
-    <li>📈 Revenue and profit trends</li>
-    <li>🌍 Regional performance comparisons</li>
-    <li>🧠 Profit drivers and business insights</li>
-    <li>📊 Supplier and cost analysis</li>
+    <li>🌍 Regions & country-level performance</li>
+    <li>📦 Products & categories</li>
+    <li>🏭 Suppliers & customer segments</li>
+    <li>📅 Time-based metrics (monthly & yearly)</li>
     </ul>
+
+    <b>📈 Key metrics you can explore:</b>
+    <ul>
+    <li>Revenue, cost, and profit</li>
+    <li>Profit margins and growth trends</li>
+    <li>Top-performing suppliers, products, and regions</li>
+    <li>Comparative performance analysis</li>
+    </ul>
+
+    <b>🧠 Example questions:</b>
+    <ul>
+    <li>Which supplier generated the highest revenue?</li>
+    <li>Which region is most profitable and how does it compare?</li>
+    <li>What are the key drivers of profit?</li>
+    <li>How did revenue trend over time?</li>
+    </ul>
+
     </div>
     """, unsafe_allow_html=True)
 
@@ -220,7 +245,6 @@ if user_input:
                 st.dataframe(df, use_container_width=True)
                 generate_chart(df, user_input)
 
-                # AUTO COMPARISON
                 if len(df) > 1 and df.shape[1] >= 2:
                     top = df.iloc[0]
                     second = df.iloc[1]
@@ -243,15 +267,18 @@ if user_input:
             with st.expander("🔍 View SQL"):
                 st.code(sql_query, language="sql")
 
-        # FEEDBACK
-        col1, col2 = st.columns(2)
+        # ---------------- FEEDBACK (COMBINED) ---------------- #
+        st.markdown("##### Was this helpful?")
+        col1, col2, col3 = st.columns([1,1,4])
 
         with col1:
-            if st.button("👍"):
+            if st.button("👍", key=f"up_{len(st.session_state.messages)}"):
                 log_feedback({"query": user_input, "response": answer, "feedback": "up"})
+                st.toast("Thanks for your feedback!")
 
         with col2:
-            if st.button("👎"):
+            if st.button("👎", key=f"down_{len(st.session_state.messages)}"):
                 log_feedback({"query": user_input, "response": answer, "feedback": "down"})
+                st.toast("Feedback noted!")
 
     st.session_state.messages.append({"role": "assistant", "content": answer})
