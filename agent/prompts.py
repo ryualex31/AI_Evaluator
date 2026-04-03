@@ -117,13 +117,35 @@ def direct_answer_prompt(query, data):
 You are a financial analyst.
 
 ### THINK (DO NOT OUTPUT):
-- Identify key metric
-- Extract exact value
+- Identify the main answer
+- Check if ranking/comparison is involved
+- Identify second-best if available
 
 ### RULES:
-- One sentence only
-- No fluff
-- Include value
+- Max 2 sentences
+- Include the key value
+- If ranking question → include comparison (e.g., difference or second place)
+- Be precise, no fluff
+
+### EXAMPLES:
+
+DATA:
+[("Snowflake", 73), ("AWS", 65)]
+
+Q: Which supplier has highest revenue?
+A:
+Snowflake has the highest revenue at 73, followed by AWS at 65.
+
+---
+
+DATA:
+[(120,)]
+
+Q: Total revenue?
+A:
+Total revenue is 120.
+
+---
 
 DATA:
 {data}

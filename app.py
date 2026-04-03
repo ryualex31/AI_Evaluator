@@ -194,37 +194,64 @@ if user_input:
         answer = output.get("direct_answer") or output.get("message") or output.get("error")
         table = output.get("table")
         insight = output.get("insight")
+        evaluation = output.get("evaluation")
+        sql_query = output.get("sql_query")
 
-        st.markdown(answer)
+        # ANSWER
+        st.markdown(f"📌 **Answer:** {answer}")
 
+        # CONFIDENCE
+        if evaluation and isinstance(evaluation, dict):
+            score = evaluation.get("overall", None)
+
+            if score is not None:
+                if score >= 4:
+                    st.success("✅ High Confidence")
+                elif score == 3:
+                    st.warning("⚠️ Medium Confidence")
+                else:
+                    st.error("❌ Low Confidence")
+
+        # TABLE + CHART
         if table:
             try:
                 df = pd.read_html(table)[0]
                 st.markdown("### 📊 Data Snapshot")
                 st.dataframe(df, use_container_width=True)
                 generate_chart(df, user_input)
+
+                # AUTO COMPARISON
+                if len(df) > 1 and df.shape[1] >= 2:
+                    top = df.iloc[0]
+                    second = df.iloc[1]
+
+                    if isinstance(top[1], (int, float)) and isinstance(second[1], (int, float)):
+                        diff = top[1] - second[1]
+                        pct = (diff / second[1]) * 100 if second[1] != 0 else 0
+
+                        st.info(f"📊 {top[0]} leads over {second[0]} by {diff:,.0f} ({pct:.1f}%)")
+
             except:
                 st.markdown(table)
 
+        # INSIGHT
         if insight and insight.strip().upper() != "NONE":
-            st.markdown(f"""
-            <div style="background:#eef6ff;padding:12px;border-radius:10px;border:1px solid #c7ddff;margin-top:10px;">
-            💡 <b>Insight:</b><br>{insight}
-            </div>
-            """, unsafe_allow_html=True)
+            st.info(f"💡 {insight}")
 
-        # ---------------- FEEDBACK ---------------- #
-        st.markdown("##### Was this helpful?")
+        # SQL VIEW
+        if sql_query:
+            with st.expander("🔍 View SQL"):
+                st.code(sql_query, language="sql")
+
+        # FEEDBACK
         col1, col2 = st.columns(2)
 
         with col1:
-            if st.button("👍", key=f"up_{len(st.session_state.messages)}"):
+            if st.button("👍"):
                 log_feedback({"query": user_input, "response": answer, "feedback": "up"})
-                st.success("Feedback recorded")
 
         with col2:
-            if st.button("👎", key=f"down_{len(st.session_state.messages)}"):
+            if st.button("👎"):
                 log_feedback({"query": user_input, "response": answer, "feedback": "down"})
-                st.warning("Feedback recorded")
 
     st.session_state.messages.append({"role": "assistant", "content": answer})
