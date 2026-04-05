@@ -221,7 +221,7 @@ for msg in st.session_state.messages:
             st.markdown(msg["content"])
 
         else:
-            st.markdown("📌 **Summary**")
+            st.markdown("### 📌 **Summary**")
             st.markdown(msg["summary"])
 
             # Insights
