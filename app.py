@@ -22,6 +22,12 @@ if "messages" not in st.session_state:
 if "pending_query" not in st.session_state:
     st.session_state.pending_query = None
 
+if "is_processing" not in st.session_state:
+    st.session_state.is_processing = False
+
+if "run_query" not in st.session_state:
+    st.session_state.run_query = None
+
 # ---------------- STYLING ---------------- #
 st.markdown("""
 <style>
@@ -42,12 +48,28 @@ def check_login():
     if st.session_state.authenticated:
         return True
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2 = st.columns([1.2, 1])
+
+    with col1:
+        st.markdown("""
+        <div style="
+            height: 100%;
+            background: linear-gradient(135deg, #0ea5e9, #6366f1);
+            border-radius: 16px;
+            padding: 40px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        ">
+            <h2>📊 AI Financial Analyst</h2>
+            <p>Analyze business performance using natural language queries</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     with col2:
         st.markdown("""
-        <div style="background:white;padding:30px;border-radius:12px;
-        border:1px solid #e5e7eb;">
+        <div style="background:white;padding:30px;border-radius:16px;border:1px solid #e5e7eb;">
         """, unsafe_allow_html=True)
 
         st.markdown("### 🔐 Sign In")
@@ -86,7 +108,7 @@ with st.sidebar:
     ]
 
     for i, ex in enumerate(examples):
-        if st.button(ex, key=f"example_{i}"):
+        if st.button(ex, key=f"example_{i}", disabled=st.session_state.is_processing):
             st.session_state.pending_query = ex
             st.rerun()
 
@@ -97,20 +119,20 @@ with st.sidebar:
     col1, col2 = st.columns(2)
 
     with col1:
-        if st.button("📈 Trends"):
+        if st.button("📈 Trends", disabled=st.session_state.is_processing):
             st.session_state.pending_query = "Show revenue trend over time"
             st.rerun()
 
-        if st.button("🌍 Regions"):
+        if st.button("🌍 Regions", disabled=st.session_state.is_processing):
             st.session_state.pending_query = "Compare profit across regions"
             st.rerun()
 
     with col2:
-        if st.button("🏆 Top"):
+        if st.button("🏆 Top", disabled=st.session_state.is_processing):
             st.session_state.pending_query = "Top 5 products by profit"
             st.rerun()
 
-        if st.button("💰 Drivers"):
+        if st.button("💰 Drivers", disabled=st.session_state.is_processing):
             st.session_state.pending_query = "What are the key drivers of profit?"
             st.rerun()
 
@@ -118,7 +140,7 @@ with st.sidebar:
 
     show_intro = st.checkbox("📘 Show Guide", value=not st.session_state.messages)
 
-    if st.button("🔄 Reset Chat"):
+    if st.button("🔄 Reset Chat", disabled=st.session_state.is_processing):
         st.session_state.messages = []
         st.session_state.pending_query = None
         st.rerun()
@@ -179,47 +201,43 @@ if show_intro:
 # ---------------- SCHEMA ---------------- #
 schema = """financials(date, month, year, region, country, product, category, customer_type, supplier, units_sold, discount, revenue, cost, profit, profit_margin)"""
 
-# ---------------- CHART ---------------- #
-def render_chart(df, chart_spec):
-    try:
-        chart_df = df[[chart_spec["x"], chart_spec["y"]]].set_index(chart_spec["x"])
-        st.markdown("### 📊 Visualization")
-
-        if chart_spec["type"] == "line":
-            st.line_chart(chart_df)
-        elif chart_spec["type"] == "bar":
-            st.bar_chart(chart_df)
-        elif chart_spec["type"] == "area":
-            st.area_chart(chart_df)
-        elif chart_spec["type"] == "pie":
-            import matplotlib.pyplot as plt
-            fig, ax = plt.subplots()
-            chart_df[chart_spec["y"]].plot.pie(ax=ax, autopct='%1.1f%%')
-            ax.set_ylabel("")
-            st.pyplot(fig)
-    except:
-        pass
-
 # ---------------- INPUT ---------------- #
-user_input = st.chat_input("Ask your financial question...")
+user_input = st.chat_input(
+    "Ask your financial question...",
+    disabled=st.session_state.is_processing
+)
 
-if st.session_state.pending_query:
+# ✅ Capture input safely (NO execution here)
+if user_input and not st.session_state.is_processing:
+    st.session_state.run_query = user_input
+    st.session_state.is_processing = True
+    st.rerun()
+
+if st.session_state.pending_query and not st.session_state.is_processing:
+    st.session_state.run_query = st.session_state.pending_query
+    st.session_state.pending_query = None
+    st.session_state.is_processing = True
+    st.rerun()
+
+# pending query
+if st.session_state.pending_query and not st.session_state.is_processing:
     user_input = st.session_state.pending_query
     st.session_state.pending_query = None
 
-## ---------------- PROCESS ---------------- #
-if user_input:
+# ---------------- CHAT HISTORY ---------------- #
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
+# ---------------- PROCESS ---------------- #
+if st.session_state.run_query and st.session_state.is_processing:
+    user_input = st.session_state.run_query
     st.session_state.messages.append({"role": "user", "content": user_input})
-
     with st.chat_message("user"):
         st.markdown(user_input)
-
     with st.chat_message("assistant"):
-
         with st.spinner("🤖 Thinking..."):
             output = run_agent(user_input, schema)
-
         summary = (
             output.get("direct_answer")
             or output.get("summary")
@@ -227,66 +245,26 @@ if user_input:
             or output.get("error")
             or "No clear answer could be generated."
         )
-
         insight = output.get("insight")
-        evaluation = output.get("evaluation")
         chart_spec = output.get("chart")
-
+        evaluation = output.get("evaluation")
         st.markdown("📌 **Summary**")
-
-        if summary and str(summary).strip().lower() != "none":
-            st.markdown(summary)
-        else:
-            st.warning("No meaningful summary could be generated.")
-
+        st.markdown(summary)
         rows = output.get("rows")
         columns = output.get("columns")
-
-        is_data_response = rows and columns
-
-        if is_data_response:
-
+        if rows and columns:
             df = pd.DataFrame(rows, columns=columns)
-
             if not df.empty:
-
-                # SORT
                 if df.shape[1] >= 2:
                     df = df.sort_values(by=df.columns[1], ascending=False)
-
-                # TABLE
                 st.markdown("### 📋 Data Snapshot")
                 st.dataframe(df, use_container_width=True, hide_index=True)
-
-                # KPI
-                if len(df) > 1 and df.shape[1] >= 2:
-                    val1 = df.iloc[0, 1]
-                    val2 = df.iloc[1, 1]
-
-                    if isinstance(val1, (int, float)) and isinstance(val2, (int, float)) and val2 != 0:
-                        pct = ((val1 - val2) / val2) * 100
-
-                        st.markdown(f"""
-                        <div style="background:#f1f5f9;padding:10px;border-radius:8px;margin-top:8px;">
-                        📊 <b>{df.iloc[0,0]}</b> leads <b>{df.iloc[1,0]}</b> by <b>{pct:.1f}%</b>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                # INSIGHTS
                 if insight and insight.strip().upper() != "NONE":
                     st.markdown("### 💡 Insights")
                     for line in insight.split("\n"):
                         if line.strip():
-                            st.markdown(f"- {line.strip().lstrip('- ')}")
-
-                # CHART
-                if chart_spec:
-                    render_chart(df, chart_spec)
-                else:
-                    st.markdown("### 📊 Visualization")
-                    st.bar_chart(df.set_index(df.columns[0])[df.columns[1]])
-
-                # CONFIDENCE
+                            st.markdown(line.strip())
+                st.bar_chart(df.set_index(df.columns[0])[df.columns[1]])
                 if evaluation:
                     score = evaluation.get("overall")
                     if score >= 4:
@@ -295,23 +273,20 @@ if user_input:
                         st.warning("⚠️ Medium Confidence")
                     else:
                         st.error("❌ Low Confidence")
-
             else:
                 st.info("No relevant data found for this query.")
-
-
         # FEEDBACK
         st.markdown("##### Was this helpful?")
-        col1, col2, _ = st.columns([1,1,4])
-
+        col1, col2, _ = st.columns([1, 1, 4])
+        msg_index = len(st.session_state.messages)
         with col1:
-            if st.button("👍", key=f"up_{len(st.session_state.messages)}"):
+            if st.button("👍", key=f"up_{msg_index}"):
                 log_feedback({"query": user_input, "response": summary, "feedback": "up"})
                 st.toast("Thanks!")
-
         with col2:
-            if st.button("👎", key=f"down_{len(st.session_state.messages)}"):
+            if st.button("👎", key=f"down_{msg_index}"):
                 log_feedback({"query": user_input, "response": summary, "feedback": "down"})
                 st.toast("Noted!")
-
     st.session_state.messages.append({"role": "assistant", "content": summary})
+    st.session_state.run_query = None
+    st.session_state.is_processing = False
