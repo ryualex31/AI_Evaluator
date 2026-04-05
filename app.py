@@ -237,7 +237,7 @@ if st.session_state.run_query and st.session_state.is_processing:
         st.markdown(user_input)
     with st.chat_message("assistant"):
         with st.spinner("🤖 Thinking..."):
-            output = run_agent(user_input, schema)
+            output = run_agent(user_input, schema, user_email=st.session_state.get("user_email"))
         summary = (
             output.get("direct_answer")
             or output.get("summary")

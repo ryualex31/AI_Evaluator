@@ -18,7 +18,7 @@ import json
 MAX_RETRIES = 2
 
 
-def run_agent(user_query, schema):
+def run_agent(user_query, schema, user_email=None):
 
     # ---------------- INTENT ---------------- #
     intent = classify_intent(user_query)
@@ -163,6 +163,7 @@ def run_agent(user_query, schema):
 
     # ---------------- LOGGING ---------------- #
     log_interaction({
+        "user_email": user_email,
         "query": user_query,
         "intent": intent,
         "sql_prompt": sql_prompt_used,
