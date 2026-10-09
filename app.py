@@ -5,6 +5,7 @@ import re
 
 from agent.orchestrator import run_agent
 from utils.logger import log_feedback
+from utils.presentation import confidence_label, default_chart, is_number, normalize_chart, result_csv
 
 # ---------------- CONFIG ---------------- #
 st.set_page_config(page_title="AI Financial Analyst", layout="wide")
@@ -70,6 +71,7 @@ def check_login():
         """, unsafe_allow_html=True)
 
         st.markdown("### 🔐 Sign In")
+        st.caption("Demo sign-in. Use any valid email and a placeholder password.")
 
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
@@ -236,19 +238,39 @@ for msg in st.session_state.messages:
                 df = pd.DataFrame(msg["rows"], columns=msg["columns"])
                 if not df.empty:
                     st.markdown("### 📋 Data Snapshot")
-                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    st.dataframe(df, width="stretch", hide_index=True)
 
-                    st.markdown("### 📊 Visualization")
-                    st.bar_chart(df.set_index(df.columns[0])[df.columns[1]])
+                    if len(msg["columns"]) == 1 and len(msg["rows"]) == 1 and is_number(msg["rows"][0][0]):
+                        st.metric(msg["columns"][0], f'{msg["rows"][0][0]:,.2f}')
+                    chart = normalize_chart(msg.get("chart"), msg["columns"], msg["rows"]) or default_chart(msg["columns"], msg["rows"])
+                    if chart:
+                        st.markdown("### 📊 Visualization")
+                        if chart["type"] == "pie":
+                            import matplotlib.pyplot as plt
+                            pie = df.dropna(subset=[chart["y"]])
+                            fig, ax = plt.subplots()
+                            ax.pie(pie[chart["y"]], labels=pie[chart["x"]].astype(str), autopct="%1.1f%%")
+                            st.pyplot(fig)
+                            plt.close(fig)
+                        else:
+                            getattr(st, chart["type"] + "_chart")(df, x=chart["x"], y=chart["y"])
+                    st.download_button("Download CSV", result_csv(msg["columns"], msg["rows"]),
+                                       "analysis.csv", "text/csv", key=f'csv_{msg["id"]}')
+
+            if msg.get("sql_query"):
+                with st.expander("View query"):
+                    st.code(msg["sql_query"], language="sql")
 
             if msg.get("evaluation"):
-                score = msg["evaluation"].get("overall")
-                if score >= 4:
+                confidence = confidence_label(msg["evaluation"].get("overall"))
+                if confidence == "high":
                     st.success("✅ High Confidence")
-                elif score == 3:
+                elif confidence == "medium":
                     st.warning("⚠️ Medium Confidence")
-                else:
+                elif confidence == "low":
                     st.error("❌ Low Confidence")
+                else:
+                    st.info("Confidence evaluation unavailable")
 
             # OPTIONAL FEEDBACK
             msg_id = msg["id"]
@@ -276,8 +298,14 @@ if st.session_state.run_query and st.session_state.is_processing:
         "content": query
     })
 
-    with st.spinner("🤖 Thinking..."):
-        output = run_agent(query, schema, user_email=st.session_state.get("user_email"))
+    try:
+        with st.spinner("🤖 Thinking..."):
+            output = run_agent(query, schema, user_email=st.session_state.get("user_email"))
+    except Exception:
+        output = {"error": "The analysis service is unavailable. Please try again."}
+    finally:
+        st.session_state.run_query = None
+        st.session_state.is_processing = False
 
     summary = (
         output.get("direct_answer")
@@ -295,7 +323,9 @@ if st.session_state.run_query and st.session_state.is_processing:
         "rows": output.get("rows"),
         "columns": output.get("columns"),
         "insight": output.get("insight"),
-        "evaluation": output.get("evaluation")
+        "evaluation": output.get("evaluation"),
+        "chart": output.get("chart"),
+        "sql_query": output.get("sql_query"),
     }
 
     st.session_state.messages.append(message_obj)

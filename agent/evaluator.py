@@ -1,70 +1,31 @@
 import json
 import re
+
 from agent.prompts import evaluation_prompt
 from utils.llm import call_llm
+from utils.presentation import normalize_score
+
+METRICS = ("accuracy", "coverage", "faithfulness", "clarity", "overall")
 
 
-def clean_llm_json(response: str):
+def clean_llm_json(response):
+    if not isinstance(response, str):
+        return None
     try:
-        # Remove markdown
-        response = re.sub(r"```json|```", "", response).strip()
-
-        # Extract JSON
         match = re.search(r"\{.*\}", response, re.DOTALL)
-        if not match:
+        data = json.loads(match.group()) if match else None
+        if not isinstance(data, dict):
             return None
-
-        data = json.loads(match.group())
-
-        # Normalize keys + values
-        for key in ["accuracy", "coverage", "faithfulness", "clarity", "overall"]:
-            val = data.get(key)
-
-            # Handle "4/5" case
-            if isinstance(val, str) and "/" in val:
-                val = val.split("/")[0]
-
-            try:
-                data[key] = int(val)
-            except:
-                data[key] = None
-
-        return data
-
-    except Exception as e:
-        print("Parsing error:", e)
-        print("Raw response:", response)
+        return {**data, **{key: normalize_score(data.get(key)) for key in METRICS}}
+    except (ValueError, TypeError):
         return None
 
 
-def evaluate_response(query, sql, data, insight):
-
-    response = call_llm(
-        evaluation_prompt(query, sql, data, insight)
-    )
-
-    print("\n=== EVALUATOR RAW ===\n", response)
-
-    if not response or response.strip() == "":
-        return {
-            "accuracy": None,
-            "coverage": None,
-            "faithfulness": None,
-            "clarity": None,
-            "overall": None,
-            "reasoning": "Empty response"
-        }
-
-    parsed = clean_llm_json(response)
-
-    if parsed:
-        return parsed
-
-    return {
-        "accuracy": None,
-        "coverage": None,
-        "faithfulness": None,
-        "clarity": None,
-        "overall": None,
-        "reasoning": f"Parsing failed. Raw: {response}"
-    }
+def evaluate_response(query, sql, data, insight, summary=None):
+    try:
+        parsed = clean_llm_json(call_llm(evaluation_prompt(query, sql, data, insight, summary)))
+        if parsed:
+            return parsed
+    except Exception:
+        pass
+    return {**dict.fromkeys(METRICS), "reasoning": "Evaluation unavailable"}

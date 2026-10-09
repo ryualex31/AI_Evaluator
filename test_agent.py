@@ -33,7 +33,7 @@ def test_query(query):
 
     # ---------------- ANSWER ---------------- #
     print("\n🧾 ANSWER:")
-    print(result["direct_answer"])
+    print(result["summary"])
 
     # ---------------- DATA ---------------- #
     print("\n📊 DATA:")
