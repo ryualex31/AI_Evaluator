@@ -1,6 +1,7 @@
-streamlit
-pandas
-openai
-python-dotenv
-requests
-matplotlib
+streamlit==1.65.0
+pandas==3.0.6
+openai==3.27.0
+python-dotenv==1.2.4
+requests==2.34.2
+matplotlib==3.11.2
+

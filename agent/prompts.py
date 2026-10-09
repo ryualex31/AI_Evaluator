@@ -311,7 +311,7 @@ RESPONSE:
 
 
 # ---------------- EVALUATION (Few-shot + Strict JSON) ---------------- #
-def evaluation_prompt(query, sql, data, insight):
+def evaluation_prompt(query, sql, data, insight, summary=None):
     return f"""
 You are an evaluator of a financial AI system.
 
@@ -344,6 +344,7 @@ INPUT:
 Query: {query}
 SQL: {sql}
 Data: {data}
+Displayed answer: {summary}
 Insight: {insight}
 """
 

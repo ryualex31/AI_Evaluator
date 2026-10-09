@@ -41,6 +41,8 @@ It reduces operational bottlenecks, improves decision speed, and enables scalabl
 - 🔁 Automatic SQL correction (retry mechanism)  
 - 🧠 LLM-based response evaluation  
 - 📝 Persistent logging for observability  
+- Validated line, bar, area and pie charts; single-value metrics
+- Query inspection and CSV download for each result
 
 ---
 
@@ -145,10 +147,19 @@ The system is designed as a modular LLM-powered analytics pipeline:
 
 ## 🛡️ Reliability & Guardrails
 
-- SQL validation before execution to prevent unsafe queries  
-- Automatic retry mechanism for failed SQL generation  
-- Query constraints (e.g., LIMIT clauses) to avoid large scans  
-- Error logging for debugging and system improvement  
+- SQLite opens the dataset in read-only mode. The authorizer restricts reads to `financials` and blocks writes, schema changes, PRAGMA, ATTACH and extension loading.
+- Queries have a two-second execution deadline, a 10,000-character SQL limit and a 100,000-byte SQLite value limit.
+- Results exceeding 200 rows are rejected. Summary, insight and evaluation receive every accepted result row, including months after the first ten.
+- Evaluation scores are validated; malformed or unavailable scores display as unavailable.
+- Provider failures return a recoverable message and release the chat's processing state.
+
+### Regression tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Tests use temporary databases and mocked providers, without Azure credentials. They include Streamlit rendering and failure recovery. Pull requests run this suite; the Azure deployment build also requires it to pass. The direct Python dependencies are pinned in `requirements.txt`.
 
 ---
 
@@ -299,3 +310,4 @@ This project demonstrates the full lifecycle of an AI product:
 
 **Ayush Gupta**  
 AI Consultant  
+
